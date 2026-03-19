@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>SyncBridge</title>
+    <link rel="icon" type="image/x-icon" href="/image/sync.ico">
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>SyncBridge</h1>
+        <p>Interface para transferência de dados entre fontes e destinos modulares.</p>
+    </header>
+
+    <form method="post" action="/transfer">
+        <div class="field-row">
+            <div class="field">
+                <label for="source_type">Tipo da origem</label>
+                <select name="source_type" id="source_type" required>
+                    <option value="csv">CSV</option>
+                    <option value="sqlite">SQLite</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="target_type">Tipo do destino</label>
+                <select name="target_type" id="target_type" required>
+                    <option value="csv">CSV</option>
+                    <option value="sqlite">SQLite</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="field">
+            <label for="source">Origem</label>
+            <input type="text" id="source" name="source" placeholder="sample_data/people.csv" required>
+        </div>
+
+        <div class="field">
+            <label for="target">Destino</label>
+            <input type="text" id="target" name="target" placeholder="sample_data/app.db" required>
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label for="table_name">Nome da tabela</label>
+                <input type="text" id="table_name" name="table_name" placeholder="people" required>
+            </div>
+            <div class="field">
+                <label for="sep_file">Separador CSV</label>
+                <select name="sep_file" id="sep_file">
+                    <option value=",">, (vírgula)</option>
+                    <option value=";">; (ponto e vírgula)</option>
+                    <option value="&#9;">&#9; (tabulação)</option>
+                    <option value="|">| (pipe)</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="submit">Executar transferência</button>
+    </form>
+
+    {% if result %}
+    <div class="result">
+        <h2>Resultado</h2>
+        <p><strong>Status:</strong> {{ result.status }}</p>
+        <p><strong>Origem:</strong> {{ result.source }}</p>
+        <p><strong>Destino:</strong> {{ result.target }}</p>
+        <p><strong>Linhas lidas:</strong> {{ result.rows_read }}</p>
+        <p><strong>Linhas escritas:</strong> {{ result.rows_written }}</p>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="error">
+        <h2>Erro</h2>
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>
