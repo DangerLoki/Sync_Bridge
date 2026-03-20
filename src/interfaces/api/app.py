@@ -13,6 +13,8 @@ from src.infrastructure.connectors.csv.csv_reader import CsvReader
 from src.infrastructure.connectors.csv.csv_writer import CsvWriter
 from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
 from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
+from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
+from src.infrastructure.connectors.parquet.parquet_writer import ParquetWriter
  
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -29,19 +31,28 @@ app.mount("/static", StaticFiles(directory="src/interfaces/api/static"), name="s
 app.mount("/image", StaticFiles(directory="src/interfaces/api/image"), name="image")
  
  
-def build_reader(source_type: str, table_name: str):
+def _parse_columns(columns: str) -> list[str] | None:
+    parsed = [c.strip() for c in columns.split(',') if c.strip()]
+    return parsed or None
+
+
+def build_reader(source_type: str, table_name: str, columns: list[str] | None = None):
     if source_type == "csv":
         return CsvReader()
     if source_type == "sqlite":
         return SqliteReader(table_name=table_name)
+    if source_type == "parquet":
+        return ParquetReader(columns=columns)
     raise ValueError(f"Unsupported source type: {source_type}")
  
  
-def build_writer(target_type: str, table_name: str):
+def build_writer(target_type: str, table_name: str, columns: list[str] | None = None):
     if target_type == "csv":
         return CsvWriter()
     if target_type == "sqlite":
         return SqliteWriter(table_name=table_name)
+    if target_type == "parquet":
+        return ParquetWriter(columns=columns)
     raise ValueError(f"Unsupported target type: {target_type}")
  
  
@@ -72,11 +83,13 @@ def transfer(
     target: str = Form(...),
     table_name: str = Form(...),
     sep_file: str = Form(','),
+    columns: str = Form(''),
 ):
-    logger.info("Transfer requested: %s -> %s (source_type=%s, target_type=%s)", source, target, source_type, target_type)
+    logger.info("Transfer requested: %s -> %s (source_type=%s, target_type=%s, columns=%s)", source, target, source_type, target_type, columns)
     try:
-        reader = build_reader(source_type=source_type, table_name=table_name)
-        writer = build_writer(target_type=target_type, table_name=table_name)
+        columns_list = _parse_columns(columns)
+        reader = build_reader(source_type=source_type, table_name=table_name, columns=columns_list)
+        writer = build_writer(target_type=target_type, table_name=table_name, columns=columns_list)
 
         service = TransferService(reader=reader, writer=writer)
         transfer_request = TransferRequest(source=source, target=target, sep_file=sep_file)

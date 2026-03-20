@@ -11,6 +11,8 @@ from src.infrastructure.connectors.csv.csv_reader import CsvReader
 from src.infrastructure.connectors.csv.csv_writer import CsvWriter
 from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
 from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
+from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
+from src.infrastructure.connectors.parquet.parquet_writer import ParquetWriter
 
 
 def create_sample_csv(file_path: Path) -> pd.DataFrame:
@@ -85,6 +87,160 @@ def test_sqlite_to_csv_success(tmp_path: Path) -> None:
 
     exported_df = pd.read_csv(target_csv)
     pd.testing.assert_frame_equal(original_df, exported_df)
+
+
+def test_csv_to_parquet_success(tmp_path: Path) -> None:
+    print(f"Testing CSV to Parquet transfer with temporary path: {tmp_path}")
+
+    source_csv = tmp_path / "people.csv"
+    target_parquet = tmp_path / "people.parquet"
+
+    original_df = create_sample_csv(source_csv)
+
+    reader = CsvReader()
+    writer = ParquetWriter()
+    service = TransferService(reader=reader, writer=writer)
+
+    request = TransferRequest(source=str(source_csv), target=str(target_parquet))
+    result = service.execute(request)
+
+    assert result.status == "SUCCESS"
+    assert result.rows_read == 4
+    assert result.rows_written == 4
+
+    exported_df = pd.read_parquet(target_parquet)
+    pd.testing.assert_frame_equal(original_df, exported_df, check_dtype=False)
+
+
+def test_parquet_to_csv_success(tmp_path: Path) -> None:
+    print(f"Testing Parquet to CSV transfer with temporary path: {tmp_path}")
+
+    source_parquet = tmp_path / "people.parquet"
+    target_csv = tmp_path / "people_exported.csv"
+
+    original_df = pd.DataFrame(
+        [
+            {"id": 1, "name": "Ana", "age": 25, "city": "Sao Paulo"},
+            {"id": 2, "name": "Bruno", "age": 31, "city": "Rio de Janeiro"},
+            {"id": 3, "name": "Carla", "age": 28, "city": "Belo Horizonte"},
+            {"id": 4, "name": "Diego", "age": 35, "city": "Curitiba"},
+        ]
+    )
+    original_df.to_parquet(source_parquet, index=False)
+
+    reader = ParquetReader()
+    writer = CsvWriter()
+    service = TransferService(reader=reader, writer=writer)
+
+    request = TransferRequest(source=str(source_parquet), target=str(target_csv))
+    result = service.execute(request)
+
+    assert result.status == "SUCCESS"
+    assert result.rows_read == 4
+    assert result.rows_written == 4
+
+    exported_df = pd.read_csv(target_csv)
+    pd.testing.assert_frame_equal(original_df, exported_df)
+
+
+def test_sqlite_to_parquet_success(tmp_path: Path) -> None:
+    print(f"Testing SQLite to Parquet transfer with temporary path: {tmp_path}")
+
+    source_db = tmp_path / "app.db"
+    target_parquet = tmp_path / "people.parquet"
+    table_name = "people"
+
+    original_df = pd.DataFrame(
+        [
+            {"id": 1, "name": "Ana", "age": 25, "city": "Sao Paulo"},
+            {"id": 2, "name": "Bruno", "age": 31, "city": "Rio de Janeiro"},
+            {"id": 3, "name": "Carla", "age": 28, "city": "Belo Horizonte"},
+            {"id": 4, "name": "Diego", "age": 35, "city": "Curitiba"},
+        ]
+    )
+
+    with sqlite3.connect(source_db) as conn:
+        original_df.to_sql(table_name, conn, if_exists="replace", index=False)
+
+    reader = SqliteReader(table_name=table_name)
+    writer = ParquetWriter()
+    service = TransferService(reader=reader, writer=writer)
+
+    request = TransferRequest(source=str(source_db), target=str(target_parquet))
+    result = service.execute(request)
+
+    assert result.status == "SUCCESS"
+    assert result.rows_read == 4
+    assert result.rows_written == 4
+
+    exported_df = pd.read_parquet(target_parquet)
+    pd.testing.assert_frame_equal(original_df, exported_df, check_dtype=False)
+
+
+def test_parquet_reader_raises_error_when_file_does_not_exist(tmp_path: Path) -> None:
+    print(f"Testing Parquet reader error handling with temporary path: {tmp_path}")
+
+    missing_parquet = tmp_path / "missing.parquet"
+    target_csv = tmp_path / "output.csv"
+
+    reader = ParquetReader()
+    writer = CsvWriter()
+    service = TransferService(reader=reader, writer=writer)
+
+    request = TransferRequest(source=str(missing_parquet), target=str(target_csv))
+
+    with pytest.raises(InvalidSourceError):
+        service.execute(request)
+
+
+def test_csv_to_parquet_with_columns(tmp_path: Path) -> None:
+    print(f"Testing CSV to Parquet with column selection: {tmp_path}")
+
+    source_csv = tmp_path / "people.csv"
+    target_parquet = tmp_path / "people_filtered.parquet"
+
+    create_sample_csv(source_csv)
+
+    reader = CsvReader()
+    writer = ParquetWriter(columns=["id", "name"])
+    service = TransferService(reader=reader, writer=writer)
+
+    request = TransferRequest(source=str(source_csv), target=str(target_parquet))
+    result = service.execute(request)
+
+    assert result.status == "SUCCESS"
+    assert result.rows_written == 4
+
+    exported_df = pd.read_parquet(target_parquet)
+    assert list(exported_df.columns) == ["id", "name"]
+
+
+def test_parquet_read_with_columns(tmp_path: Path) -> None:
+    print(f"Testing Parquet read with column selection: {tmp_path}")
+
+    source_parquet = tmp_path / "people.parquet"
+    target_csv = tmp_path / "people_filtered.csv"
+
+    df = pd.DataFrame(
+        [
+            {"id": 1, "name": "Ana", "age": 25, "city": "Sao Paulo"},
+            {"id": 2, "name": "Bruno", "age": 31, "city": "Rio de Janeiro"},
+        ]
+    )
+    df.to_parquet(source_parquet, index=False)
+
+    reader = ParquetReader(columns=["id", "city"])
+    writer = CsvWriter()
+    service = TransferService(reader=reader, writer=writer)
+
+    request = TransferRequest(source=str(source_parquet), target=str(target_csv))
+    result = service.execute(request)
+
+    assert result.status == "SUCCESS"
+    assert result.rows_read == 2
+
+    exported_df = pd.read_csv(target_csv)
+    assert list(exported_df.columns) == ["id", "city"]
 
 
 def test_csv_reader_raises_error_when_file_does_not_exist(tmp_path: Path) -> None:

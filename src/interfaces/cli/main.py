@@ -5,6 +5,8 @@ from src.infrastructure.connectors.csv.csv_reader import CsvReader
 from src.infrastructure.connectors.csv.csv_writer import CsvWriter
 from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
 from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
+from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
+from src.infrastructure.connectors.parquet.parquet_writer import ParquetWriter
 
 
 def run_csv_to_sqlite() -> None:
@@ -35,10 +37,40 @@ def run_sqlite_to_csv() -> None:
     print(result)
 
 
+def run_csv_to_parquet() -> None:
+    request = TransferRequest(
+        source="sample_data/people.csv",
+        target="sample_data/people.parquet",
+    )
+
+    reader = CsvReader()
+    writer = ParquetWriter()
+    service = TransferService(reader=reader, writer=writer)
+
+    result = service.execute(request)
+    print(result)
+
+
+def run_parquet_to_csv() -> None:
+    request = TransferRequest(
+        source="sample_data/people.parquet",
+        target="sample_data/people_from_parquet.csv",
+    )
+
+    reader = ParquetReader()
+    writer = CsvWriter()
+    service = TransferService(reader=reader, writer=writer)
+
+    result = service.execute(request)
+    print(result)
+
+
 def main() -> None:
     try:
         run_csv_to_sqlite()
         run_sqlite_to_csv()
+        run_csv_to_parquet()
+        run_parquet_to_csv()
     except TransferError as exc:
         print(f"Transfer failed: {exc}")
 

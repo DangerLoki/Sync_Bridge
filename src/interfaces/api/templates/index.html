@@ -21,6 +21,7 @@
                 <select name="source_type" id="source_type" required>
                     <option value="csv">CSV</option>
                     <option value="sqlite">SQLite</option>
+                    <option value="parquet">Parquet</option>
                 </select>
             </div>
             <div class="field">
@@ -28,6 +29,7 @@
                 <select name="target_type" id="target_type" required>
                     <option value="csv">CSV</option>
                     <option value="sqlite">SQLite</option>
+                    <option value="parquet">Parquet</option>
                 </select>
             </div>
         </div>
@@ -56,6 +58,11 @@
                     <option value="|">| (pipe)</option>
                 </select>
             </div>
+        </div>
+
+        <div class="field">
+            <label for="columns">Colunas Parquet (opcional, separadas por vírgula)</label>
+            <input type="text" id="columns" name="columns" placeholder="id, name, age">
         </div>
 
         <button type="submit">Executar transferência</button>
