@@ -11,6 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.' + prefix + '-' + type + '-field').forEach(el => {
             el.classList.remove('d-none');
         });
+
+        // Toggle required on file path field (not needed for sqlserver)
+        const pathField = document.getElementById(prefix);
+        if (pathField) {
+            if (type === 'sqlserver') {
+                pathField.removeAttribute('required');
+            } else {
+                pathField.setAttribute('required', '');
+            }
+        }
     }
 
     sourceType.addEventListener('change', () => updateFields('source'));
@@ -42,25 +52,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function validateStep(n) {
         if (n === 1) {
-            if (!document.getElementById('source').value.trim()) {
-                alert('Informe o caminho da origem.');
-                return false;
-            }
-            if (sourceType.value === 'sqlite' &&
-                !document.getElementById('source_table_name').value.trim()) {
-                alert('Informe o nome da tabela de origem.');
-                return false;
+            if (sourceType.value === 'sqlserver') {
+                if (!document.getElementById('source_connection_string').value.trim()) {
+                    alert('Informe a string de conexão da origem.');
+                    return false;
+                }
+                if (!document.getElementById('source_table_name_sql').value.trim()) {
+                    alert('Informe o nome da tabela de origem.');
+                    return false;
+                }
+            } else {
+                if (!document.getElementById('source').value.trim()) {
+                    alert('Informe o caminho da origem.');
+                    return false;
+                }
+                if (sourceType.value === 'sqlite' &&
+                    !document.getElementById('source_table_name').value.trim()) {
+                    alert('Informe o nome da tabela de origem.');
+                    return false;
+                }
             }
         }
         if (n === 2) {
-            if (!document.getElementById('target').value.trim()) {
-                alert('Informe o caminho do destino.');
-                return false;
-            }
-            if (targetType.value === 'sqlite' &&
-                !document.getElementById('target_table_name').value.trim()) {
-                alert('Informe o nome da tabela de destino.');
-                return false;
+            if (targetType.value === 'sqlserver') {
+                if (!document.getElementById('target_connection_string').value.trim()) {
+                    alert('Informe a string de conexão do destino.');
+                    return false;
+                }
+                if (!document.getElementById('target_table_name_sql').value.trim()) {
+                    alert('Informe o nome da tabela de destino.');
+                    return false;
+                }
+            } else {
+                if (!document.getElementById('target').value.trim()) {
+                    alert('Informe o caminho do destino.');
+                    return false;
+                }
+                if (targetType.value === 'sqlite' &&
+                    !document.getElementById('target_table_name').value.trim()) {
+                    alert('Informe o nome da tabela de destino.');
+                    return false;
+                }
             }
         }
         return true;
@@ -79,11 +111,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildSummary() {
         const srcType = sourceType.value.toUpperCase();
-        const srcPath = document.getElementById('source').value;
         const tgtType = targetType.value.toUpperCase();
-        const tgtPath = document.getElementById('target').value;
 
-        function extras(type, tblId, sepId, colId, encId) {
+        const srcPath = sourceType.value === 'sqlserver'
+            ? document.getElementById('source_connection_string').value
+            : document.getElementById('source').value;
+        const tgtPath = targetType.value === 'sqlserver'
+            ? document.getElementById('target_connection_string').value
+            : document.getElementById('target').value;
+
+        function extras(type, tblId, sepId, colId, encId, tblSqlId) {
             const items = [];
             if (type === 'SQLITE') {
                 const t = document.getElementById(tblId).value;
@@ -98,6 +135,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const comp = document.getElementById(colId);
                 if (comp) items.push('Compressão: <strong>' + esc(comp.options[comp.selectedIndex].text) + '</strong>');
             }
+            if (type === 'SQLSERVER') {
+                const t = document.getElementById(tblSqlId).value;
+                if (t) items.push('Tabela: <strong>' + esc(t) + '</strong>');
+            }
             return items.length
                 ? '<div class="summary-extra mt-2">' + items.join(' &middot; ') + '</div>'
                 : '';
@@ -107,18 +148,18 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="summary-row">'
           + '  <div class="summary-block summary-source">'
           + '    <span class="section-badge source-badge">ENTRADA</span>'
-          + '    <div class="summary-type">' + esc(srcType) + '</div>'
+          + '    <div class="summary-type">' + esc(srcType === 'SQLSERVER' ? 'SQL SERVER' : srcType) + '</div>'
           + '    <div class="summary-path">' + esc(srcPath) + '</div>'
-          +      extras(srcType, 'source_table_name', 'source_sep_file', 'source_columns', 'source_encoding')
+          +      extras(srcType, 'source_table_name', 'source_sep_file', 'source_columns', 'source_encoding', 'source_table_name_sql')
           + '  </div>'
           + '  <div class="summary-arrow">'
           + '    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>'
           + '  </div>'
           + '  <div class="summary-block summary-target">'
           + '    <span class="section-badge target-badge">SAÍDA</span>'
-          + '    <div class="summary-type">' + esc(tgtType) + '</div>'
+          + '    <div class="summary-type">' + esc(tgtType === 'SQLSERVER' ? 'SQL SERVER' : tgtType) + '</div>'
           + '    <div class="summary-path">' + esc(tgtPath) + '</div>'
-          +      extras(tgtType, 'target_table_name', 'target_sep_file', 'target_columns', 'target_encoding')
+          +      extras(tgtType, 'target_table_name', 'target_sep_file', 'target_columns', 'target_encoding', 'target_table_name_sql')
           + '  </div>'
           + '</div>';
     }
@@ -242,3 +283,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return d.innerHTML;
     }
 }());
+
+// ── SQL Server: testar conexão ──────────────────────────────────
+window.testConnection = function (inputId, statusId) {
+    const connStr = document.getElementById(inputId).value.trim();
+    const statusEl = document.getElementById(statusId);
+
+    if (!connStr) {
+        statusEl.innerHTML = '<span class="badge bg-warning-subtle text-warning-emphasis">'
+            + '<i class="bi bi-exclamation-triangle me-1"></i>Informe a string de conexão</span>';
+        return;
+    }
+
+    statusEl.innerHTML = '<span class="badge bg-secondary-subtle text-secondary-emphasis">'
+        + '<span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>Testando...</span>';
+
+    const body = new URLSearchParams({ connection_string: connStr });
+    fetch('/test-connection', { method: 'POST', body })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                statusEl.innerHTML = '<span class="badge bg-success-subtle text-success-emphasis">'
+                    + '<i class="bi bi-check-circle me-1"></i>Conexão OK</span>';
+            } else {
+                statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger-emphasis" title="'
+                    + data.message.replace(/"/g, '&quot;') + '">'
+                    + '<i class="bi bi-x-circle me-1"></i>Falha — passe o mouse para ver o erro</span>';
+            }
+        })
+        .catch(() => {
+            statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger-emphasis">'
+                + '<i class="bi bi-x-circle me-1"></i>Erro ao chamar o servidor</span>';
+        });
+};

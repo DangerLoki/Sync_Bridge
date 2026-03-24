@@ -84,10 +84,11 @@
                             <option value="csv">CSV</option>
                             <option value="sqlite">SQLite</option>
                             <option value="parquet">Parquet</option>
+                            <option value="sqlserver">SQL Server</option>
                         </select>
                     </div>
 
-                    <div class="col-12">
+                    <div class="col-12 source-field source-csv-field source-sqlite-field source-parquet-field">
                         <label for="source" class="form-label fw-semibold">Caminho do arquivo / banco</label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="source" name="source"
@@ -129,6 +130,26 @@
                             </span>
                         </div>
                     </div>
+
+                    <div class="col-12 source-field source-sqlserver-field d-none">
+                        <label class="form-label fw-semibold">String de conexão</label>
+                        <input type="text" class="form-control" id="source_connection_string"
+                               name="source_connection_string"
+                               placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Connection=yes;">
+                        <div class="d-flex align-items-center gap-2 mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="testConnection('source_connection_string', 'source-conn-status')">
+                                <i class="bi bi-plug me-1"></i>Testar conexão
+                            </button>
+                            <span id="source-conn-status"></span>
+                        </div>
+                    </div>
+
+                    <div class="col-12 source-field source-sqlserver-field d-none">
+                        <label for="source_table_name_sql" class="form-label fw-semibold">Nome da tabela</label>
+                        <input type="text" class="form-control" id="source_table_name_sql"
+                               name="source_table_name_sql" placeholder="dbo.people">
+                    </div>
                 </div>
 
                 <div class="d-flex justify-content-end mt-4 pt-3 border-top">
@@ -159,10 +180,11 @@
                             <option value="csv">CSV</option>
                             <option value="sqlite">SQLite</option>
                             <option value="parquet">Parquet</option>
+                            <option value="sqlserver">SQL Server</option>
                         </select>
                     </div>
 
-                    <div class="col-12">
+                    <div class="col-12 target-field target-csv-field target-sqlite-field target-parquet-field">
                         <label for="target" class="form-label fw-semibold">Caminho do arquivo / banco</label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="target" name="target"
@@ -205,6 +227,26 @@
                             <option value="zstd">Zstandard (equilibrado)</option>
                             <option value="none">Nenhuma (sem compressão)</option>
                         </select>
+                    </div>
+
+                    <div class="col-12 target-field target-sqlserver-field d-none">
+                        <label class="form-label fw-semibold">String de conexão</label>
+                        <input type="text" class="form-control" id="target_connection_string"
+                               name="target_connection_string"
+                               placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Connection=yes;">
+                        <div class="d-flex align-items-center gap-2 mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="testConnection('target_connection_string', 'target-conn-status')">
+                                <i class="bi bi-plug me-1"></i>Testar conexão
+                            </button>
+                            <span id="target-conn-status"></span>
+                        </div>
+                    </div>
+
+                    <div class="col-12 target-field target-sqlserver-field d-none">
+                        <label for="target_table_name_sql" class="form-label fw-semibold">Nome da tabela</label>
+                        <input type="text" class="form-control" id="target_table_name_sql"
+                               name="target_table_name_sql" placeholder="dbo.people">
                     </div>
                 </div>
 
