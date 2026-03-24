@@ -1,7 +1,8 @@
 import logging
+from pathlib import Path
 
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -56,6 +57,24 @@ def build_writer(target_type: str, table_name: str, columns: list[str] | None = 
     raise ValueError(f"Unsupported target type: {target_type}")
  
  
+@app.get("/browse")
+def browse(path: str = Query(default=".")) -> JSONResponse:
+    base = Path(path).resolve()
+    entries = []
+    try:
+        items = sorted(base.iterdir(), key=lambda e: (e.is_file(), e.name.lower()))
+        for entry in items:
+            entries.append({
+                "name": entry.name,
+                "path": str(entry),
+                "is_dir": entry.is_dir(),
+            })
+    except PermissionError:
+        pass
+    parent = str(base.parent) if base.parent != base else None
+    return JSONResponse({"current": str(base), "parent": parent, "entries": entries})
+
+
 @app.get("/health")
 def health() -> dict:
     logger.debug("Health check requested")
@@ -81,18 +100,36 @@ def transfer(
     target_type: str = Form(...),
     source: str = Form(...),
     target: str = Form(...),
-    table_name: str = Form(...),
-    sep_file: str = Form(','),
-    columns: str = Form(''),
+    source_table_name: str = Form(''),
+    target_table_name: str = Form(''),
+    source_sep_file: str = Form(','),
+    target_sep_file: str = Form(','),
+    source_columns: str = Form(''),
+    target_columns: str = Form(''),
 ):
-    logger.info("Transfer requested: %s -> %s (source_type=%s, target_type=%s, columns=%s)", source, target, source_type, target_type, columns)
+    logger.info(
+        "Transfer requested: %s -> %s (source_type=%s, target_type=%s)",
+        source, target, source_type, target_type,
+    )
     try:
-        columns_list = _parse_columns(columns)
-        reader = build_reader(source_type=source_type, table_name=table_name, columns=columns_list)
-        writer = build_writer(target_type=target_type, table_name=table_name, columns=columns_list)
+        source_columns_list = _parse_columns(source_columns)
+        target_columns_list = _parse_columns(target_columns)
+
+        if source_type == "sqlite" and not source_table_name:
+            raise ValueError("Nome da tabela é obrigatório para origens SQLite.")
+        if target_type == "sqlite" and not target_table_name:
+            raise ValueError("Nome da tabela é obrigatório para destinos SQLite.")
+
+        reader = build_reader(source_type=source_type, table_name=source_table_name, columns=source_columns_list)
+        writer = build_writer(target_type=target_type, table_name=target_table_name, columns=target_columns_list)
 
         service = TransferService(reader=reader, writer=writer)
-        transfer_request = TransferRequest(source=source, target=target, sep_file=sep_file)
+        transfer_request = TransferRequest(
+            source=source,
+            target=target,
+            source_sep_file=source_sep_file,
+            target_sep_file=target_sep_file,
+        )
         result = service.execute(transfer_request)
 
         logger.info("Transfer completed: %d rows read, %d rows written", result.rows_read, result.rows_written)

@@ -1,0 +1,241 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const sourceType = document.getElementById('source_type');
+    const targetType = document.getElementById('target_type');
+
+    // ── Visibilidade de campos por tipo ──────────────────────────
+    function updateFields(prefix) {
+        const type = document.getElementById(prefix + '_type').value;
+        document.querySelectorAll('.' + prefix + '-field').forEach(el => {
+            el.classList.add('d-none');
+        });
+        const active = document.querySelector('.' + prefix + '-' + type + '-field');
+        if (active) active.classList.remove('d-none');
+    }
+
+    sourceType.addEventListener('change', () => updateFields('source'));
+    targetType.addEventListener('change', () => updateFields('target'));
+
+    // ── Wizard navigation ───────────────────────────────────────
+    const panels = document.querySelectorAll('.step-panel');
+    const dots   = document.querySelectorAll('.stepper-step');
+    const lines  = document.querySelectorAll('.stepper-line');
+
+    function goToStep(n) {
+        panels.forEach(p => {
+            p.classList.remove('active');
+            p.classList.add('d-none');
+        });
+        const activePanel = document.getElementById('step-' + n);
+        activePanel.classList.remove('d-none');
+        activePanel.classList.add('active');
+
+        dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i + 1 === n);
+            dot.classList.toggle('done',   i + 1 < n);
+        });
+        lines.forEach((line, i) => {
+            line.classList.toggle('done', i + 1 < n);
+        });
+    }
+    window.goToStep = goToStep;
+
+    function validateStep(n) {
+        if (n === 1) {
+            if (!document.getElementById('source').value.trim()) {
+                alert('Informe o caminho da origem.');
+                return false;
+            }
+            if (sourceType.value === 'sqlite' &&
+                !document.getElementById('source_table_name').value.trim()) {
+                alert('Informe o nome da tabela de origem.');
+                return false;
+            }
+        }
+        if (n === 2) {
+            if (!document.getElementById('target').value.trim()) {
+                alert('Informe o caminho do destino.');
+                return false;
+            }
+            if (targetType.value === 'sqlite' &&
+                !document.getElementById('target_table_name').value.trim()) {
+                alert('Informe o nome da tabela de destino.');
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function selText(id) {
+        const el = document.getElementById(id);
+        return el ? el.options[el.selectedIndex].text : '';
+    }
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function buildSummary() {
+        const srcType = sourceType.value.toUpperCase();
+        const srcPath = document.getElementById('source').value;
+        const tgtType = targetType.value.toUpperCase();
+        const tgtPath = document.getElementById('target').value;
+
+        function extras(type, tblId, sepId, colId) {
+            const items = [];
+            if (type === 'SQLITE') {
+                const t = document.getElementById(tblId).value;
+                if (t) items.push('Tabela: <strong>' + esc(t) + '</strong>');
+            }
+            if (type === 'CSV') {
+                items.push('Separador: <strong>' + esc(selText(sepId)) + '</strong>');
+            }
+            if (type === 'PARQUET') {
+                const c = document.getElementById(colId).value;
+                if (c) items.push('Colunas: <strong>' + esc(c) + '</strong>');
+            }
+            return items.length
+                ? '<div class="summary-extra mt-2">' + items.join(' &middot; ') + '</div>'
+                : '';
+        }
+
+        document.getElementById('summary-content').innerHTML =
+            '<div class="summary-row">'
+          + '  <div class="summary-block summary-source">'
+          + '    <span class="section-badge source-badge">ENTRADA</span>'
+          + '    <div class="summary-type">' + esc(srcType) + '</div>'
+          + '    <div class="summary-path">' + esc(srcPath) + '</div>'
+          +      extras(srcType, 'source_table_name', 'source_sep_file', 'source_columns')
+          + '  </div>'
+          + '  <div class="summary-arrow">'
+          + '    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>'
+          + '  </div>'
+          + '  <div class="summary-block summary-target">'
+          + '    <span class="section-badge target-badge">SAÍDA</span>'
+          + '    <div class="summary-type">' + esc(tgtType) + '</div>'
+          + '    <div class="summary-path">' + esc(tgtPath) + '</div>'
+          +      extras(tgtType, 'target_table_name', 'target_sep_file', 'target_columns')
+          + '  </div>'
+          + '</div>';
+    }
+
+    window.nextStep = function (current) {
+        if (!validateStep(current)) return;
+        if (current === 2) buildSummary();
+        goToStep(current + 1);
+    };
+
+    // Inicializa
+    updateFields('source');
+    updateFields('target');
+    goToStep(1);
+});
+
+// ── File browser modal ──────────────────────────────────────────
+(function () {
+    let _targetFieldId = null;
+    let _selectedPath  = null;
+    let _modal         = null;
+
+    window.openBrowser = function (fieldId) {
+        _targetFieldId = fieldId;
+        _selectedPath  = null;
+
+        if (!_modal) {
+            _modal = new bootstrap.Modal(document.getElementById('fileBrowserModal'));
+        }
+
+        // Start from current field value or working dir
+        const current = document.getElementById(fieldId).value.trim() || '.';
+        _modal.show();
+        loadDir(current);
+    };
+
+    function loadDir(path) {
+        document.getElementById('browser-select-btn').disabled = true;
+        _selectedPath = null;
+
+        const list = document.getElementById('browser-list');
+        list.innerHTML = '<div class="text-center py-4 text-body-secondary">'
+            + '<div class="spinner-border spinner-border-sm me-2"></div>Carregando...</div>';
+
+        fetch('/browse?path=' + encodeURIComponent(path))
+            .then(r => r.json())
+            .then(data => renderDir(data))
+            .catch(() => {
+                list.innerHTML = '<div class="text-center py-4 text-danger">'
+                    + '<i class="bi bi-exclamation-triangle me-2"></i>Erro ao carregar diretório.</div>';
+            });
+    }
+
+    function renderDir(data) {
+        document.getElementById('browser-current-path').textContent = data.current;
+
+        const list = document.getElementById('browser-list');
+        let html = '';
+
+        if (data.parent) {
+            html += '<button type="button" class="list-group-item list-group-item-action browser-item py-2 px-3"'
+                + ' data-path="' + esc(data.parent) + '" data-is-dir="true">'
+                + '<i class="bi bi-arrow-up-circle text-secondary me-2"></i>'
+                + '<span class="text-secondary fst-italic">..</span>'
+                + '</button>';
+        }
+
+        data.entries.forEach(entry => {
+            const icon = entry.is_dir
+                ? '<i class="bi bi-folder-fill text-warning me-2"></i>'
+                : '<i class="bi bi-file-earmark text-secondary me-2"></i>';
+            html += '<button type="button" class="list-group-item list-group-item-action browser-item py-2 px-3'
+                + (entry.is_dir ? '' : ' browser-file') + '"'
+                + ' data-path="' + esc(entry.path) + '" data-is-dir="' + entry.is_dir + '">'
+                + icon + esc(entry.name)
+                + '</button>';
+        });
+
+        if (!html) {
+            html = '<div class="text-center py-4 text-body-secondary">Diretório vazio.</div>';
+        }
+
+        list.innerHTML = html;
+
+        list.querySelectorAll('.browser-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const isDir = btn.dataset.isDir === 'true';
+                const path  = btn.dataset.path;
+
+                if (isDir) {
+                    loadDir(path);
+                } else {
+                    // Deselect previous
+                    list.querySelectorAll('.browser-item.active').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    _selectedPath = path;
+                    document.getElementById('browser-select-btn').disabled = false;
+                }
+            });
+
+            // Double-click on file also confirms
+            if (btn.dataset.isDir === 'false') {
+                btn.addEventListener('dblclick', () => {
+                    _selectedPath = btn.dataset.path;
+                    confirmBrowse();
+                });
+            }
+        });
+    }
+
+    window.confirmBrowse = function () {
+        if (_selectedPath && _targetFieldId) {
+            document.getElementById(_targetFieldId).value = _selectedPath;
+        }
+        if (_modal) _modal.hide();
+    };
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+}());

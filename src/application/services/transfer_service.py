@@ -15,12 +15,12 @@ class TransferService:
 
     def execute(self, request: TransferRequest) -> TransferResult:
         logger.debug("Reading from '%s'", request.source)
-        data = self.reader.read(request.source, sep_file=request.sep_file)
+        data = self.reader.read(request.source, sep_file=request.source_sep_file)
         rows_read = len(data)
         logger.debug("Read %d rows from '%s'", rows_read, request.source)
 
         logger.debug("Writing to '%s'", request.target)
-        rows_written = self.writer.write(data, request.target, sep_file=request.sep_file)
+        rows_written = self.writer.write(data, request.target, sep_file=request.target_sep_file)
         logger.debug("Wrote %d rows to '%s'", rows_written, request.target)
 
         return TransferResult(
