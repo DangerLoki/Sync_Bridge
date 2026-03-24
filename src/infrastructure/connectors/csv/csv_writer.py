@@ -9,10 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 class CsvWriter(DataWriter):
+    def __init__(self, encoding: str = 'utf-8-sig') -> None:
+        self.encoding = encoding
+
     def write(self, data: pd.DataFrame, target: str, sep_file: str = ',') -> int:
         try:
             logger.debug("Writing %d rows to CSV file: %s", len(data), target)
-            data.to_csv(target, index=False, sep=sep_file)
+            data.to_csv(target, index=False, sep=sep_file, encoding=self.encoding)
             logger.debug("CSV write complete: %s", target)
             return len(data)
         except Exception as exc:

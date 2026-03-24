@@ -30,30 +30,25 @@ templates = Jinja2Templates(directory="src/interfaces/api/templates")
 
 app.mount("/static", StaticFiles(directory="src/interfaces/api/static"), name="static")
 app.mount("/image", StaticFiles(directory="src/interfaces/api/image"), name="image")
- 
- 
-def _parse_columns(columns: str) -> list[str] | None:
-    parsed = [c.strip() for c in columns.split(',') if c.strip()]
-    return parsed or None
 
 
-def build_reader(source_type: str, table_name: str, columns: list[str] | None = None):
+def build_reader(source_type: str, table_name: str, encoding: str = 'utf-8-sig'):
     if source_type == "csv":
-        return CsvReader()
+        return CsvReader(encoding=encoding)
     if source_type == "sqlite":
         return SqliteReader(table_name=table_name)
     if source_type == "parquet":
-        return ParquetReader(columns=columns)
+        return ParquetReader()
     raise ValueError(f"Unsupported source type: {source_type}")
  
  
-def build_writer(target_type: str, table_name: str, columns: list[str] | None = None):
+def build_writer(target_type: str, table_name: str, encoding: str = 'utf-8-sig', compression: str = 'snappy'):
     if target_type == "csv":
-        return CsvWriter()
+        return CsvWriter(encoding=encoding)
     if target_type == "sqlite":
         return SqliteWriter(table_name=table_name)
     if target_type == "parquet":
-        return ParquetWriter(columns=columns)
+        return ParquetWriter(compression=compression)
     raise ValueError(f"Unsupported target type: {target_type}")
  
  
@@ -104,24 +99,22 @@ def transfer(
     target_table_name: str = Form(''),
     source_sep_file: str = Form(','),
     target_sep_file: str = Form(','),
-    source_columns: str = Form(''),
-    target_columns: str = Form(''),
+    source_encoding: str = Form('utf-8-sig'),
+    target_encoding: str = Form('utf-8-sig'),
+    target_compression: str = Form('snappy'),
 ):
     logger.info(
         "Transfer requested: %s -> %s (source_type=%s, target_type=%s)",
         source, target, source_type, target_type,
     )
     try:
-        source_columns_list = _parse_columns(source_columns)
-        target_columns_list = _parse_columns(target_columns)
-
         if source_type == "sqlite" and not source_table_name:
             raise ValueError("Nome da tabela é obrigatório para origens SQLite.")
         if target_type == "sqlite" and not target_table_name:
             raise ValueError("Nome da tabela é obrigatório para destinos SQLite.")
 
-        reader = build_reader(source_type=source_type, table_name=source_table_name, columns=source_columns_list)
-        writer = build_writer(target_type=target_type, table_name=target_table_name, columns=target_columns_list)
+        reader = build_reader(source_type=source_type, table_name=source_table_name, encoding=source_encoding)
+        writer = build_writer(target_type=target_type, table_name=target_table_name, encoding=target_encoding, compression=target_compression)
 
         service = TransferService(reader=reader, writer=writer)
         transfer_request = TransferRequest(
@@ -129,6 +122,8 @@ def transfer(
             target=target,
             source_sep_file=source_sep_file,
             target_sep_file=target_sep_file,
+            source_encoding=source_encoding,
+            target_encoding=target_encoding,
         )
         result = service.execute(transfer_request)
 

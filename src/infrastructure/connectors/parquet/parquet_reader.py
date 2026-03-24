@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Optional
 
 import pandas as pd
 
@@ -14,9 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class ParquetReader(DataReader):
-    def __init__(self, columns: Optional[list[str]] = None) -> None:
-        self.columns = columns
-
     def read(self, source: str, sep_file: str = ',') -> pd.DataFrame:
         if not os.path.exists(source):
             raise InvalidSourceError(f"Source file does not exist: {source}")
@@ -25,8 +21,8 @@ class ParquetReader(DataReader):
             raise InvalidSourceError(f"Source file is not a Parquet file: {source}")
 
         try:
-            logger.debug("Reading Parquet file: %s (columns=%s)", source, self.columns)
-            df = pd.read_parquet(source, columns=self.columns)
+            logger.debug("Reading Parquet file: %s", source)
+            df = pd.read_parquet(source)
             logger.debug("Parquet read complete: %d rows, %d columns", len(df), len(df.columns))
             return df
         except Exception as exc:

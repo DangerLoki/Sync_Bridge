@@ -8,8 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.' + prefix + '-field').forEach(el => {
             el.classList.add('d-none');
         });
-        const active = document.querySelector('.' + prefix + '-' + type + '-field');
-        if (active) active.classList.remove('d-none');
+        document.querySelectorAll('.' + prefix + '-' + type + '-field').forEach(el => {
+            el.classList.remove('d-none');
+        });
     }
 
     sourceType.addEventListener('change', () => updateFields('source'));
@@ -82,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tgtType = targetType.value.toUpperCase();
         const tgtPath = document.getElementById('target').value;
 
-        function extras(type, tblId, sepId, colId) {
+        function extras(type, tblId, sepId, colId, encId) {
             const items = [];
             if (type === 'SQLITE') {
                 const t = document.getElementById(tblId).value;
@@ -90,10 +91,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (type === 'CSV') {
                 items.push('Separador: <strong>' + esc(selText(sepId)) + '</strong>');
+                const enc = document.getElementById(encId).value || 'utf-8-sig';
+                items.push('Encoding: <strong>' + esc(enc) + '</strong>');
             }
             if (type === 'PARQUET') {
-                const c = document.getElementById(colId).value;
-                if (c) items.push('Colunas: <strong>' + esc(c) + '</strong>');
+                const comp = document.getElementById(colId);
+                if (comp) items.push('Compressão: <strong>' + esc(comp.options[comp.selectedIndex].text) + '</strong>');
             }
             return items.length
                 ? '<div class="summary-extra mt-2">' + items.join(' &middot; ') + '</div>'
@@ -106,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
           + '    <span class="section-badge source-badge">ENTRADA</span>'
           + '    <div class="summary-type">' + esc(srcType) + '</div>'
           + '    <div class="summary-path">' + esc(srcPath) + '</div>'
-          +      extras(srcType, 'source_table_name', 'source_sep_file', 'source_columns')
+          +      extras(srcType, 'source_table_name', 'source_sep_file', 'source_columns', 'source_encoding')
           + '  </div>'
           + '  <div class="summary-arrow">'
           + '    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>'
@@ -115,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
           + '    <span class="section-badge target-badge">SAÍDA</span>'
           + '    <div class="summary-type">' + esc(tgtType) + '</div>'
           + '    <div class="summary-path">' + esc(tgtPath) + '</div>'
-          +      extras(tgtType, 'target_table_name', 'target_sep_file', 'target_columns')
+          +      extras(tgtType, 'target_table_name', 'target_sep_file', 'target_columns', 'target_encoding')
           + '  </div>'
           + '</div>';
     }

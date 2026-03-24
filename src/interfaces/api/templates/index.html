@@ -109,6 +109,12 @@
                         </select>
                     </div>
 
+                    <div class="col-12 source-field source-csv-field">
+                        <label for="source_encoding" class="form-label fw-semibold">Encoding</label>
+                        <input type="text" class="form-control" id="source_encoding"
+                               name="source_encoding" value="utf-8-sig" placeholder="utf-8-sig">
+                    </div>
+
                     <div class="col-12 source-field source-sqlite-field d-none">
                         <label for="source_table_name" class="form-label fw-semibold">Nome da tabela</label>
                         <input type="text" class="form-control" id="source_table_name"
@@ -116,11 +122,12 @@
                     </div>
 
                     <div class="col-12 source-field source-parquet-field d-none">
-                        <label for="source_columns" class="form-label fw-semibold">
-                            Colunas a ler <span class="text-body-secondary fw-normal">(opcional)</span>
-                        </label>
-                        <input type="text" class="form-control" id="source_columns"
-                               name="source_columns" placeholder="id, name, age">
+                        <label class="form-label fw-semibold">Compressão do arquivo</label>
+                        <div class="d-flex gap-2 flex-wrap pt-1" id="source-compression-info">
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis px-3 py-2">
+                                <i class="bi bi-info-circle me-1"></i>A compressão é detectada automaticamente na leitura
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -177,6 +184,12 @@
                         </select>
                     </div>
 
+                    <div class="col-12 target-field target-csv-field">
+                        <label for="target_encoding" class="form-label fw-semibold">Encoding</label>
+                        <input type="text" class="form-control" id="target_encoding"
+                               name="target_encoding" value="utf-8-sig" placeholder="utf-8-sig">
+                    </div>
+
                     <div class="col-12 target-field target-sqlite-field d-none">
                         <label for="target_table_name" class="form-label fw-semibold">Nome da tabela</label>
                         <input type="text" class="form-control" id="target_table_name"
@@ -184,11 +197,14 @@
                     </div>
 
                     <div class="col-12 target-field target-parquet-field d-none">
-                        <label for="target_columns" class="form-label fw-semibold">
-                            Colunas a escrever <span class="text-body-secondary fw-normal">(opcional)</span>
-                        </label>
-                        <input type="text" class="form-control" id="target_columns"
-                               name="target_columns" placeholder="id, name, age">
+                        <label for="target_compression" class="form-label fw-semibold">Compressão</label>
+                        <select class="form-select" name="target_compression" id="target_compression">
+                            <option value="snappy">Snappy (padrão — rápido)</option>
+                            <option value="gzip">GZIP (menor tamanho)</option>
+                            <option value="brotli">Brotli (melhor compressão)</option>
+                            <option value="zstd">Zstandard (equilibrado)</option>
+                            <option value="none">Nenhuma (sem compressão)</option>
+                        </select>
                     </div>
                 </div>
 

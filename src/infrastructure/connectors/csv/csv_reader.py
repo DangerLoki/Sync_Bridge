@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class CsvReader(DataReader):
+    def __init__(self, encoding: str = 'utf-8-sig') -> None:
+        self.encoding = encoding
+
     def read(self, source: str, sep_file: str = ',') -> pd.DataFrame:
         if not os.path.exists(source):
             raise InvalidSourceError(f"Source file does not exist: {source}")
@@ -21,7 +24,7 @@ class CsvReader(DataReader):
             raise InvalidSourceError(f"Source file is not a CSV: {source}")
         try:
             logger.debug("Reading CSV file: %s", source)
-            df = pd.read_csv(source, sep=sep_file)
+            df = pd.read_csv(source, sep=sep_file, encoding=self.encoding)
             logger.debug("CSV read complete: %d rows, %d columns", len(df), len(df.columns))
             return df
         except Exception as exc:
