@@ -12,19 +12,47 @@ document.addEventListener('DOMContentLoaded', () => {
             el.classList.remove('d-none');
         });
 
-        // Toggle required on file path field (not needed for sqlserver)
+        // Toggle required on file path field (not needed for sqlserver/oracle/bigquery)
         const pathField = document.getElementById(prefix);
         if (pathField) {
-            if (type === 'sqlserver') {
+            if (type === 'sqlserver' || type === 'oracle' || type === 'bigquery') {
                 pathField.removeAttribute('required');
             } else {
                 pathField.setAttribute('required', '');
             }
         }
+
+        // Keep Oracle client dir conditional on thick mode selection
+        if (type === 'oracle') {
+            updateOracleClientDir(prefix);
+        }
     }
 
-    sourceType.addEventListener('change', () => updateFields('source'));
+    sourceType.addEventListener('change', () => {
+        updateFields('source');
+        updateQueryHint();
+    });
     targetType.addEventListener('change', () => updateFields('target'));
+
+    // ── Dica dinâmica no campo de consulta personalizada ─────────
+    function updateQueryHint() {
+        const type = sourceType.value;
+        const textarea = document.getElementById('source_custom_query');
+        const hint = document.getElementById('custom-query-hint');
+        if (!textarea || !hint) return;
+
+        const hints = {
+            csv:       { ph: 'idade > 30 and cidade == "SP"', txt: 'Use sintaxe <a href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html" target="_blank">pandas.DataFrame.query()</a>. Ex.: <code>idade > 30 and cidade == "SP"</code>' },
+            parquet:   { ph: 'idade > 30 and cidade == "SP"', txt: 'Use sintaxe <a href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html" target="_blank">pandas.DataFrame.query()</a>. Ex.: <code>idade > 30 and cidade == "SP"</code>' },
+            sqlite:    { ph: 'SELECT * FROM people WHERE age > 30', txt: 'Escreva uma consulta SQL válida para SQLite. A tabela informada acima é ignorada quando uma consulta personalizada é fornecida.' },
+            sqlserver: { ph: 'SELECT * FROM [dbo].[people] WHERE age > 30', txt: 'Escreva uma consulta T-SQL válida. A tabela informada acima é ignorada quando uma consulta personalizada é fornecida.' },
+            oracle:    { ph: 'SELECT * FROM "SCHEMA"."TABELA" WHERE ROWNUM <= 1000', txt: 'Escreva uma consulta Oracle SQL válida. A tabela informada acima é ignorada quando uma consulta personalizada é fornecida.' },
+            bigquery:  { ph: 'SELECT * FROM `projeto.dataset.tabela` WHERE data > "2024-01-01"', txt: 'Escreva uma consulta BigQuery Standard SQL válida. A tabela informada acima é ignorada quando uma consulta personalizada é fornecida.' },
+        };
+        const h = hints[type] || hints.csv;
+        textarea.placeholder = h.ph;
+        hint.innerHTML = h.txt;
+    }
 
     // ── Wizard navigation ───────────────────────────────────────
     const panels = document.querySelectorAll('.step-panel');
@@ -61,6 +89,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('Informe o nome da tabela de origem.');
                     return false;
                 }
+            } else if (sourceType.value === 'oracle') {
+                if (!document.getElementById('source_oracle_dsn').value.trim()) {
+                    alert('Informe o DSN de conexão da origem Oracle.');
+                    return false;
+                }
+                if (!document.getElementById('source_table_name_oracle').value.trim()) {
+                    alert('Informe o nome da tabela de origem Oracle.');
+                    return false;
+                }
+            } else if (sourceType.value === 'bigquery') {
+                if (!document.getElementById('source_bq_credentials_file').value.trim()) {
+                    alert('Informe o arquivo de credenciais JSON da origem BigQuery.');
+                    return false;
+                }
+                if (!document.getElementById('source_table_name_bq').value.trim()) {
+                    alert('Informe a tabela de origem BigQuery (dataset.tabela).');
+                    return false;
+                }
             } else {
                 if (!document.getElementById('source').value.trim()) {
                     alert('Informe o caminho da origem.');
@@ -81,6 +127,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (!document.getElementById('target_table_name_sql').value.trim()) {
                     alert('Informe o nome da tabela de destino.');
+                    return false;
+                }
+            } else if (targetType.value === 'oracle') {
+                if (!document.getElementById('target_oracle_dsn').value.trim()) {
+                    alert('Informe o DSN de conexão do destino Oracle.');
+                    return false;
+                }
+                if (!document.getElementById('target_table_name_oracle').value.trim()) {
+                    alert('Informe o nome da tabela de destino Oracle.');
+                    return false;
+                }
+            } else if (targetType.value === 'bigquery') {
+                if (!document.getElementById('target_bq_credentials_file').value.trim()) {
+                    alert('Informe o arquivo de credenciais JSON do destino BigQuery.');
+                    return false;
+                }
+                if (!document.getElementById('target_table_name_bq').value.trim()) {
+                    alert('Informe a tabela de destino BigQuery (dataset.tabela).');
                     return false;
                 }
             } else {
@@ -115,12 +179,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const srcPath = sourceType.value === 'sqlserver'
             ? document.getElementById('source_connection_string').value
-            : document.getElementById('source').value;
+            : sourceType.value === 'oracle'
+                ? document.getElementById('source_oracle_dsn').value
+                : sourceType.value === 'bigquery'
+                    ? document.getElementById('source_bq_credentials_file').value
+                    : document.getElementById('source').value;
         const tgtPath = targetType.value === 'sqlserver'
             ? document.getElementById('target_connection_string').value
-            : document.getElementById('target').value;
+            : targetType.value === 'oracle'
+                ? document.getElementById('target_oracle_dsn').value
+                : targetType.value === 'bigquery'
+                    ? document.getElementById('target_bq_credentials_file').value
+                    : document.getElementById('target').value;
 
-        function extras(type, tblId, sepId, colId, encId, tblSqlId) {
+        function extras(type, tblId, sepId, colId, encId, tblSqlId, tblOracleId, oracleModePrefix) {
             const items = [];
             if (type === 'SQLITE') {
                 const t = document.getElementById(tblId).value;
@@ -139,6 +211,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const t = document.getElementById(tblSqlId).value;
                 if (t) items.push('Tabela: <strong>' + esc(t) + '</strong>');
             }
+            if (type === 'ORACLE') {
+                const t = document.getElementById(tblOracleId).value;
+                if (t) items.push('Tabela: <strong>' + esc(t) + '</strong>');
+                const modeEl = document.querySelector('input[name="' + oracleModePrefix + '_oracle_mode"]:checked');
+                if (modeEl) items.push('Modo: <strong>' + esc(modeEl.value) + '</strong>');
+            }
+            if (type === 'BIGQUERY') {
+                const t = document.getElementById(oracleModePrefix + '_table_name_bq').value;
+                if (t) items.push('Tabela: <strong>' + esc(t) + '</strong>');
+                const proj = document.getElementById(oracleModePrefix + '_bq_project_id').value;
+                if (proj) items.push('Project: <strong>' + esc(proj) + '</strong>');
+            }
             return items.length
                 ? '<div class="summary-extra mt-2">' + items.join(' &middot; ') + '</div>'
                 : '';
@@ -150,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
           + '    <span class="section-badge source-badge">ENTRADA</span>'
           + '    <div class="summary-type">' + esc(srcType === 'SQLSERVER' ? 'SQL SERVER' : srcType) + '</div>'
           + '    <div class="summary-path">' + esc(srcPath) + '</div>'
-          +      extras(srcType, 'source_table_name', 'source_sep_file', 'source_columns', 'source_encoding', 'source_table_name_sql')
+          +      extras(srcType, 'source_table_name', 'source_sep_file', 'source_columns', 'source_encoding', 'source_table_name_sql', 'source_table_name_oracle', 'source')
           + '  </div>'
           + '  <div class="summary-arrow">'
           + '    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>'
@@ -159,9 +243,22 @@ document.addEventListener('DOMContentLoaded', () => {
           + '    <span class="section-badge target-badge">SAÍDA</span>'
           + '    <div class="summary-type">' + esc(tgtType === 'SQLSERVER' ? 'SQL SERVER' : tgtType) + '</div>'
           + '    <div class="summary-path">' + esc(tgtPath) + '</div>'
-          +      extras(tgtType, 'target_table_name', 'target_sep_file', 'target_columns', 'target_encoding', 'target_table_name_sql')
+          +      extras(tgtType, 'target_table_name', 'target_sep_file', 'target_columns', 'target_encoding', 'target_table_name_sql', 'target_table_name_oracle', 'target')
           + '  </div>'
           + '</div>';
+
+        // Adiciona consulta personalizada ao resumo, se preenchida
+        const customQ = (document.getElementById('source_custom_query') || {}).value || '';
+        if (customQ.trim()) {
+            document.getElementById('summary-content').innerHTML +=
+                '<div class="mt-3 p-3 bg-body-secondary rounded-3">'
+              + '  <div class="d-flex align-items-center gap-2 mb-2">'
+              + '    <i class="bi bi-funnel text-primary"></i>'
+              + '    <strong>Consulta personalizada</strong>'
+              + '  </div>'
+              + '  <pre class="mb-0 small bg-white p-2 rounded border" style="white-space:pre-wrap">' + esc(customQ.trim()) + '</pre>'
+              + '</div>';
+        }
     }
 
     window.nextStep = function (current) {
@@ -173,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializa
     updateFields('source');
     updateFields('target');
+    updateQueryHint();
     goToStep(1);
 });
 
@@ -283,6 +381,91 @@ document.addEventListener('DOMContentLoaded', () => {
         return d.innerHTML;
     }
 }());
+
+// ── BigQuery: testar conexão ────────────────────────────────────
+window.testBigQueryConnection = function (prefix) {
+    const fileEl = document.getElementById(prefix + '_bq_credentials_file');
+    const projEl = document.getElementById(prefix + '_bq_project_id');
+    const statusEl = document.getElementById(prefix + '-bq-conn-status');
+    const credFile = fileEl ? fileEl.value.trim() : '';
+    const projectId = projEl ? projEl.value.trim() : '';
+
+    if (!credFile) {
+        statusEl.innerHTML = '<span class="badge bg-warning-subtle text-warning-emphasis">'
+            + '<i class="bi bi-exclamation-triangle me-1"></i>Informe o arquivo JSON</span>';
+        return;
+    }
+
+    statusEl.innerHTML = '<span class="badge bg-secondary-subtle text-secondary-emphasis">'
+        + '<span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>Testando...</span>';
+
+    const body = new URLSearchParams({ credentials_file: credFile, project_id: projectId });
+    fetch('/test-connection-bigquery', { method: 'POST', body })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                statusEl.innerHTML = '<span class="badge bg-success-subtle text-success-emphasis">'
+                    + '<i class="bi bi-check-circle me-1"></i>' + data.message + '</span>';
+            } else {
+                statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger-emphasis" title="'
+                    + data.message.replace(/"/g, '&quot;') + '">'
+                    + '<i class="bi bi-x-circle me-1"></i>Falha — passe o mouse para ver o erro</span>';
+            }
+        })
+        .catch(() => {
+            statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger-emphasis">'
+                + '<i class="bi bi-x-circle me-1"></i>Erro ao chamar o servidor</span>';
+        });
+};
+
+// ── Oracle: alternar visibilidade do diretório do client ────────
+window.updateOracleClientDir = function (prefix) {
+    const thickRadio = document.getElementById(prefix + '_oracle_mode_thick');
+    const row = document.getElementById(prefix + '-oracle-client-dir-row');
+    if (!row) return;
+    if (thickRadio && thickRadio.checked) {
+        row.classList.remove('d-none');
+    } else {
+        row.classList.add('d-none');
+    }
+};
+
+// ── Oracle: testar conexão ──────────────────────────────────────
+window.testOracleConnection = function (prefix) {
+    const dsn = document.getElementById(prefix + '_oracle_dsn').value.trim();
+    const statusEl = document.getElementById(prefix + '-oracle-conn-status');
+    const modeEl = document.querySelector('input[name="' + prefix + '_oracle_mode"]:checked');
+    const mode = modeEl ? modeEl.value : 'thin';
+    const clientDirEl = document.getElementById(prefix + '_oracle_client_dir');
+    const clientDir = clientDirEl ? clientDirEl.value.trim() : '';
+
+    if (!dsn) {
+        statusEl.innerHTML = '<span class="badge bg-warning-subtle text-warning-emphasis">'
+            + '<i class="bi bi-exclamation-triangle me-1"></i>Informe o DSN</span>';
+        return;
+    }
+
+    statusEl.innerHTML = '<span class="badge bg-secondary-subtle text-secondary-emphasis">'
+        + '<span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>Testando...</span>';
+
+    const body = new URLSearchParams({ dsn, mode, client_lib_dir: clientDir });
+    fetch('/test-connection-oracle', { method: 'POST', body })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                statusEl.innerHTML = '<span class="badge bg-success-subtle text-success-emphasis">'
+                    + '<i class="bi bi-check-circle me-1"></i>Conexão OK</span>';
+            } else {
+                statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger-emphasis" title="'
+                    + data.message.replace(/"/g, '&quot;') + '">'
+                    + '<i class="bi bi-x-circle me-1"></i>Falha — passe o mouse para ver o erro</span>';
+            }
+        })
+        .catch(() => {
+            statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger-emphasis">'
+                + '<i class="bi bi-x-circle me-1"></i>Erro ao chamar o servidor</span>';
+        });
+};
 
 // ── SQL Server: testar conexão ──────────────────────────────────
 window.testConnection = function (inputId, statusId) {

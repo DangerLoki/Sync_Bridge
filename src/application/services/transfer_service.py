@@ -15,7 +15,11 @@ class TransferService:
 
     def execute(self, request: TransferRequest) -> TransferResult:
         logger.debug("Reading from '%s'", request.source)
-        data = self.reader.read(request.source, sep_file=request.source_sep_file)
+        data = self.reader.read(
+            request.source,
+            sep_file=request.source_sep_file,
+            custom_query=request.custom_query,
+        )
         rows_read = len(data)
         logger.debug("Read %d rows from '%s'", rows_read, request.source)
 

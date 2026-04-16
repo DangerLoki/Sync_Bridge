@@ -8,25 +8,36 @@ O SyncBridge foi criado para praticar e demonstrar uma arquitetura de software m
 
 O projeto permite:
 
-- transferir dados entre **CSV**, **SQLite**, **Parquet** e **SQL Server**
+- transferir dados entre **CSV**, **SQLite**, **Parquet**, **SQL Server**, **Oracle** e **BigQuery**
 - configurar separador e encoding dos arquivos CSV
 - configurar compressão dos arquivos Parquet (snappy, gzip, brotli, zstd)
 - conectar ao SQL Server via connection string (ODBC)
+- conectar ao Oracle em modo **Thin** (puro Python) ou **Thick** (Oracle Instant Client)
+- conectar ao BigQuery via arquivo de credenciais JSON (Service Account)
+- aplicar **consultas/filtros personalizados** na leitura (SQL nativo ou expressão pandas, dependendo da fonte)
 - operar via **CLI** ou via **interface web (FastAPI)**
 - navegar e selecionar arquivos pelo navegador integrado na interface web
+- testar conexões (SQL Server, Oracle, BigQuery) diretamente pela interface
 - tratar erros de leitura e escrita com exceções customizadas
 - validar o fluxo com testes automatizados
 
 ## Funcionalidades atuais
 
-- Transferência entre qualquer combinação de **CSV**, **SQLite**, **Parquet** e **SQL Server**
+- Transferência entre qualquer combinação de **CSV**, **SQLite**, **Parquet**, **SQL Server**, **Oracle** e **BigQuery**
 - Separador de CSV configurável (vírgula, ponto e vírgula, tabulação, pipe)
 - Encoding de CSV configurável (padrão `utf-8-sig`)
 - Compressão de Parquet configurável na escrita (snappy, gzip, brotli, zstd, nenhuma)
 - Conexão ao SQL Server via connection string ODBC com nome de tabela configurável
+- Conexão ao Oracle com escolha entre modo **Thin** e **Thick**, com campo para informar o diretório do Oracle Instant Client
+- Conexão ao BigQuery via arquivo JSON de Service Account, com Project ID opcional
+- **Consulta personalizada (opcional)** — permite filtrar ou transformar os dados na leitura:
+  - **Bancos de dados** (SQLite, SQL Server, Oracle, BigQuery): consulta SQL nativa que substitui o `SELECT *` padrão
+  - **Arquivos** (CSV, Parquet): expressão `pandas.DataFrame.query()` aplicada após a leitura
 - Interface **Web (FastAPI + Jinja2 + Bootstrap 5)** com wizard de 3 etapas (Entrada → Saída → Resumo)
 - Navegador de arquivos do servidor integrado à interface web
+- Botão de **testar conexão** para SQL Server, Oracle e BigQuery
 - Campos condicionais por tipo de origem/destino
+- Placeholder e dicas dinâmicas no campo de consulta, adaptados à linguagem da fonte selecionada
 - Interface **CLI** com fluxos de demonstração pré-configurados
 - Estrutura em camadas com conectores desacoplados por interfaces (Ports and Adapters)
 - Tratamento de erros com exceções customizadas
@@ -35,12 +46,28 @@ O projeto permite:
 
 ## Conectores disponíveis
 
-| Conector     | Leitura | Escrita | Configurações                          |
-|--------------|---------|---------|----------------------------------------|
-| **CSV**      | ✅      | ✅      | Separador, Encoding                    |
-| **SQLite**   | ✅      | ✅      | Nome da tabela                         |
-| **Parquet**  | ✅      | ✅      | Compressão (escrita)                   |
-| **SQL Server** | ✅    | ✅      | Connection string (ODBC), Nome da tabela |
+| Conector       | Leitura | Escrita | Configurações                                                        |
+|----------------|---------|---------|----------------------------------------------------------------------|
+| **CSV**        | ✅      | ✅      | Separador, Encoding                                                   |
+| **SQLite**     | ✅      | ✅      | Nome da tabela                                                        |
+| **Parquet**    | ✅      | ✅      | Compressão (escrita)                                                  |
+| **SQL Server** | ✅      | ✅      | Connection string (ODBC), Nome da tabela                              |
+| **Oracle**     | ✅      | ✅      | DSN, Nome da tabela, Modo (Thin / Thick), Diretório do Instant Client |
+| **BigQuery**   | ✅      | ✅      | Arquivo JSON de credenciais, Project ID, Nome da tabela (dataset.tabela) |
+
+## Consulta personalizada
+
+O campo de consulta personalizada é **opcional** e aparece em um painel colapsável no passo de Entrada. Quando preenchido, altera a forma como os dados são lidos:
+
+| Fonte                              | Linguagem              | Exemplo                                                  |
+|------------------------------------|------------------------|----------------------------------------------------------|
+| CSV / Parquet                      | `pandas.DataFrame.query()` | `idade > 30 and cidade == "SP"`                         |
+| SQLite                             | SQL (SQLite)           | `SELECT * FROM people WHERE age > 30`                    |
+| SQL Server                         | T-SQL                  | `SELECT * FROM [dbo].[people] WHERE age > 30`            |
+| Oracle                             | Oracle SQL             | `SELECT * FROM "SCHEMA"."TABELA" WHERE ROWNUM <= 1000`   |
+| BigQuery                           | Standard SQL           | `` SELECT * FROM `projeto.dataset.tabela` WHERE data > "2024-01-01" `` |
+
+Quando o campo fica vazio, o comportamento padrão é mantido (`SELECT *` ou leitura completa do arquivo).
 
 ## Estrutura do projeto
 
@@ -61,6 +88,8 @@ src/
       sqlite/
       parquet/
       sqlserver/
+      oracle/
+      bigquery/
   interfaces/
     cli/
     api/
@@ -85,10 +114,10 @@ O projeto segue uma abordagem de **arquitetura modular em camadas**, inspirada n
 * **core**: configurações transversais (ex: logging)
 * **domain**: contratos (`DataReader`, `DataWriter`), modelos e exceções da aplicação
 * **application**: serviços responsáveis pelos casos de uso (`TransferService`)
-* **infrastructure**: implementações concretas dos conectores (CSV, SQLite, Parquet, SQL Server)
+* **infrastructure**: implementações concretas dos conectores (CSV, SQLite, Parquet, SQL Server, Oracle, BigQuery)
 * **interfaces**: pontos de entrada da aplicação (CLI e API web)
 
-Essa estrutura facilita a evolução do projeto para novos conectores no futuro, como por exemplo BigQuery, PostgreSQL, Excel ou outros formatos.
+Essa estrutura facilita a evolução do projeto para novos conectores no futuro, como por exemplo PostgreSQL, Excel, MySQL ou outros formatos.
 
 ## Tecnologias utilizadas
 
@@ -99,6 +128,8 @@ Essa estrutura facilita a evolução do projeto para novos conectores no futuro,
 * **Bootstrap 5** — interface web responsiva
 * **PyArrow** — leitura e escrita de Parquet
 * **pyodbc** — conexão com SQL Server via ODBC
+* **oracledb** — conexão com Oracle (modo Thin puro-Python ou Thick com Instant Client)
+* **google-cloud-bigquery** + **db-dtypes** — conexão com BigQuery via API
 * **SQLite** (stdlib) — banco de dados local
 * **Pytest** — testes automatizados
 
@@ -132,9 +163,9 @@ pytest -q
 
 ## Exemplo de fluxo (interface web)
 
-1. **Entrada** — Selecione o tipo de origem (CSV, SQLite, Parquet ou SQL Server), informe o caminho ou connection string, e configure os parâmetros específicos
+1. **Entrada** — Selecione o tipo de origem (CSV, SQLite, Parquet, SQL Server, Oracle ou BigQuery), informe o caminho/connection string/DSN/credenciais, configure os parâmetros específicos e, opcionalmente, escreva uma consulta personalizada
 2. **Saída** — Selecione o tipo de destino e configure os parâmetros de escrita
-3. **Resumo** — Revise a configuração e execute a transferência
+3. **Resumo** — Revise a configuração (incluindo a consulta, se houver) e execute a transferência
 4. **Resultado** — Veja o status, quantidade de linhas lidas e escritas
 
 ## Tratamento de erros
@@ -143,10 +174,12 @@ O projeto possui tratamento para cenários como:
 
 * arquivo de origem inexistente
 * caminho de origem/destino inválido
-* falha ao ler tabela (SQLite ou SQL Server)
+* falha ao ler tabela (SQLite, SQL Server, Oracle ou BigQuery)
 * falha ao escrever no destino
-* nome da tabela ou connection string não informados
+* nome da tabela, connection string, DSN ou arquivo de credenciais não informados
+* falha na inicialização do Oracle Instant Client (modo Thick)
 * tipo de conector não suportado
+* consulta personalizada inválida
 
 ## Logging
 
@@ -154,14 +187,37 @@ Os logs são gravados simultaneamente no console e no arquivo `logs/sync_bridge.
 
 Formato: `%(asctime)s | %(levelname)-8s | %(name)s | %(message)s`
 
-## Pré-requisitos para SQL Server
+## Pré-requisitos por conector
 
-Para utilizar o conector SQL Server, é necessário ter um **ODBC Driver** instalado na máquina (ex: `ODBC Driver 17 for SQL Server` ou `ODBC Driver 18 for SQL Server`).
+### SQL Server
+
+É necessário ter um **ODBC Driver** instalado na máquina (ex: `ODBC Driver 17 for SQL Server` ou `ODBC Driver 18 for SQL Server`).
 
 Exemplo de connection string:
 
 ```
 DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Connection=yes;
+```
+
+### Oracle
+
+- **Modo Thin** (padrão): não requer instalação extra — puro Python.
+- **Modo Thick**: requer o [Oracle Instant Client](https://www.oracle.com/database/technologies/instant-client.html) instalado. Informe o caminho do diretório na interface ou configure a variável de ambiente `LD_LIBRARY_PATH`.
+
+Exemplo de DSN:
+
+```
+scott/tiger@localhost:1521/FREEPDB1
+```
+
+### BigQuery
+
+É necessário um arquivo JSON de **Service Account** com permissões de leitura/escrita no BigQuery. O Project ID pode ser informado manualmente ou é lido automaticamente do JSON.
+
+Instale as dependências:
+
+```bash
+pip install google-cloud-bigquery db-dtypes
 ```
 
 ## O que este projeto demonstra
@@ -171,7 +227,8 @@ DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Co
 * arquitetura em camadas (Ports and Adapters)
 * abstração de conectores com interfaces
 * manipulação de dados tabulares com pandas
-* leitura e escrita entre múltiplos formatos e bancos de dados
+* leitura e escrita entre múltiplos formatos e bancos de dados (CSV, SQLite, Parquet, SQL Server, Oracle, BigQuery)
+* consulta personalizada na leitura (SQL nativo ou expressão pandas)
 * tratamento de erros com exceções customizadas
 * logging com rotação de arquivos
 * API REST com FastAPI
@@ -180,15 +237,17 @@ DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Co
 
 ## Limitações atuais
 
-* estratégia de escrita no SQLite e SQL Server fixa em `replace` (substitui a tabela)
+* estratégia de escrita no SQLite, SQL Server e Oracle fixa em `replace` (substitui a tabela)
 * CLI sem parâmetros de linha de comando (configuração por código)
 * conector SQL Server requer ODBC Driver instalado na máquina
+* conector Oracle em modo Thick requer Oracle Instant Client instalado
+* conector BigQuery requer arquivo de credenciais JSON e acesso à API do Google Cloud
 
 ## Próximos passos
 
 * adicionar argumentos de linha de comando na CLI (`argparse` ou `typer`)
 * suportar estratégias de escrita como `append`
-* expandir conectores (ex: Excel, PostgreSQL, BigQuery)
+* expandir conectores (ex: Excel, PostgreSQL, MySQL)
 * evoluir a estrutura de configuração da transferência
 
 ## Motivação

@@ -22,17 +22,20 @@ class SqlServerReader(DataReader):
     def __init__(self, table_name: str) -> None:
         self.table_name = table_name
 
-    def read(self, source: str, sep_file: str = ',') -> pd.DataFrame:
+    def read(self, source: str, sep_file: str = ',', custom_query: str = '') -> pd.DataFrame:
         if not source:
             raise InvalidSourceError("SQL Server connection string is required.")
 
-        query = f"SELECT * FROM {_qualify(self.table_name)}"
+        if custom_query.strip():
+            query = custom_query.strip()
+        else:
+            query = f"SELECT * FROM {_qualify(self.table_name)}"
 
         try:
-            logger.debug("Reading table '%s' from SQL Server", self.table_name)
+            logger.debug("Reading from SQL Server — query: %s", query)
             with pyodbc.connect(source) as connection:
                 df = pd.read_sql(query, connection)
-            logger.debug("SQL Server read complete: %d rows from '%s'", len(df), self.table_name)
+            logger.debug("SQL Server read complete: %d rows", len(df))
             return df
         except pyodbc.Error as exc:
             logger.error("Failed to read table '%s' from SQL Server: %s", self.table_name, exc)

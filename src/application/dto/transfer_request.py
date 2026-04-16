@@ -7,6 +7,7 @@ class TransferRequest:
         target_sep_file: str = ',',
         source_encoding: str = 'utf-8-sig',
         target_encoding: str = 'utf-8-sig',
+        custom_query: str = '',
     ) -> None:
         self.source = source
         self.target = target
@@ -14,3 +15,4 @@ class TransferRequest:
         self.target_sep_file = target_sep_file
         self.source_encoding = source_encoding
         self.target_encoding = target_encoding
+        self.custom_query = custom_query

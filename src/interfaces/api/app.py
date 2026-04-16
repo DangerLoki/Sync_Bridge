@@ -18,6 +18,10 @@ from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
 from src.infrastructure.connectors.parquet.parquet_writer import ParquetWriter
 from src.infrastructure.connectors.sqlserver.sqlserver_reader import SqlServerReader
 from src.infrastructure.connectors.sqlserver.sqlserver_writer import SqlServerWriter
+from src.infrastructure.connectors.oracle.oracle_reader import OracleReader
+from src.infrastructure.connectors.oracle.oracle_writer import OracleWriter
+from src.infrastructure.connectors.bigquery.bigquery_reader import BigQueryReader
+from src.infrastructure.connectors.bigquery.bigquery_writer import BigQueryWriter
  
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -34,7 +38,14 @@ app.mount("/static", StaticFiles(directory="src/interfaces/api/static"), name="s
 app.mount("/image", StaticFiles(directory="src/interfaces/api/image"), name="image")
 
 
-def build_reader(source_type: str, table_name: str, encoding: str = 'utf-8-sig'):
+def build_reader(
+    source_type: str,
+    table_name: str,
+    encoding: str = 'utf-8-sig',
+    oracle_mode: str = 'thin',
+    oracle_client_dir: str = '',
+    bq_project_id: str = '',
+):
     if source_type == "csv":
         return CsvReader(encoding=encoding)
     if source_type == "sqlite":
@@ -43,10 +54,22 @@ def build_reader(source_type: str, table_name: str, encoding: str = 'utf-8-sig')
         return ParquetReader()
     if source_type == "sqlserver":
         return SqlServerReader(table_name=table_name)
+    if source_type == "oracle":
+        return OracleReader(table_name=table_name, mode=oracle_mode, client_lib_dir=oracle_client_dir)
+    if source_type == "bigquery":
+        return BigQueryReader(table_name=table_name, project_id=bq_project_id)
     raise ValueError(f"Unsupported source type: {source_type}")
  
  
-def build_writer(target_type: str, table_name: str, encoding: str = 'utf-8-sig', compression: str = 'snappy'):
+def build_writer(
+    target_type: str,
+    table_name: str,
+    encoding: str = 'utf-8-sig',
+    compression: str = 'snappy',
+    oracle_mode: str = 'thin',
+    oracle_client_dir: str = '',
+    bq_project_id: str = '',
+):
     if target_type == "csv":
         return CsvWriter(encoding=encoding)
     if target_type == "sqlite":
@@ -55,6 +78,10 @@ def build_writer(target_type: str, table_name: str, encoding: str = 'utf-8-sig',
         return ParquetWriter(compression=compression)
     if target_type == "sqlserver":
         return SqlServerWriter(table_name=table_name)
+    if target_type == "oracle":
+        return OracleWriter(table_name=table_name, mode=oracle_mode, client_lib_dir=oracle_client_dir)
+    if target_type == "bigquery":
+        return BigQueryWriter(table_name=table_name, project_id=bq_project_id)
     raise ValueError(f"Unsupported target type: {target_type}")
  
  
@@ -86,6 +113,51 @@ def test_connection(connection_string: str = Form(...)) -> JSONResponse:
         return JSONResponse({"ok": True, "message": "Conexão realizada com sucesso!"})
     except Exception as exc:
         logger.warning("SQL Server connection test failed: %s", exc)
+        return JSONResponse({"ok": False, "message": str(exc)})
+
+
+@app.post("/test-connection-oracle")
+def test_connection_oracle(
+    dsn: str = Form(...),
+    mode: str = Form('thin'),
+    client_lib_dir: str = Form(''),
+) -> JSONResponse:
+    try:
+        import oracledb
+        if mode == 'thick':
+            try:
+                oracledb.init_oracle_client(lib_dir=client_lib_dir or None)
+            except Exception:
+                pass  # já inicializado anteriormente
+        with oracledb.connect(dsn):
+            pass
+        logger.info("Oracle connection test succeeded (mode=%s)", mode)
+        return JSONResponse({"ok": True, "message": "Conexão Oracle realizada com sucesso!"})
+    except Exception as exc:
+        logger.warning("Oracle connection test failed: %s", exc)
+        return JSONResponse({"ok": False, "message": str(exc)})
+
+
+@app.post("/test-connection-bigquery")
+def test_connection_bigquery(
+    credentials_file: str = Form(...),
+    project_id: str = Form(''),
+) -> JSONResponse:
+    try:
+        from google.cloud import bigquery
+        from google.oauth2 import service_account
+        credentials = service_account.Credentials.from_service_account_file(
+            credentials_file,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        project = project_id or credentials.project_id
+        client = bigquery.Client(credentials=credentials, project=project)
+        # Testa listando os datasets (operação leve)
+        next(iter(client.list_datasets(max_results=1)), None)
+        logger.info("BigQuery connection test succeeded (project=%s)", project)
+        return JSONResponse({"ok": True, "message": f"Conexão BigQuery OK — projeto: {project}"})
+    except Exception as exc:
+        logger.warning("BigQuery connection test failed: %s", exc)
         return JSONResponse({"ok": False, "message": str(exc)})
 
 
@@ -125,6 +197,21 @@ def transfer(
     target_connection_string: str = Form(''),
     source_table_name_sql: str = Form(''),
     target_table_name_sql: str = Form(''),
+    source_oracle_dsn: str = Form(''),
+    target_oracle_dsn: str = Form(''),
+    source_table_name_oracle: str = Form(''),
+    target_table_name_oracle: str = Form(''),
+    source_oracle_mode: str = Form('thin'),
+    target_oracle_mode: str = Form('thin'),
+    source_oracle_client_dir: str = Form(''),
+    target_oracle_client_dir: str = Form(''),
+    source_bq_credentials_file: str = Form(''),
+    target_bq_credentials_file: str = Form(''),
+    source_bq_project_id: str = Form(''),
+    target_bq_project_id: str = Form(''),
+    source_table_name_bq: str = Form(''),
+    target_table_name_bq: str = Form(''),
+    source_custom_query: str = Form(''),
 ):
     # For SQL Server, the connection string replaces the file path
     if source_type == "sqlserver" and source_connection_string:
@@ -136,6 +223,24 @@ def transfer(
         source_table_name = source_table_name_sql
     if target_type == "sqlserver":
         target_table_name = target_table_name_sql
+    # For Oracle, DSN replaces the file path
+    if source_type == "oracle" and source_oracle_dsn:
+        source = source_oracle_dsn
+    if target_type == "oracle" and target_oracle_dsn:
+        target = target_oracle_dsn
+    if source_type == "oracle":
+        source_table_name = source_table_name_oracle
+    if target_type == "oracle":
+        target_table_name = target_table_name_oracle
+    # For BigQuery, credentials file replaces the file path
+    if source_type == "bigquery" and source_bq_credentials_file:
+        source = source_bq_credentials_file
+    if target_type == "bigquery" and target_bq_credentials_file:
+        target = target_bq_credentials_file
+    if source_type == "bigquery":
+        source_table_name = source_table_name_bq
+    if target_type == "bigquery":
+        target_table_name = target_table_name_bq
 
     logger.info(
         "Transfer requested: %s -> %s (source_type=%s, target_type=%s)",
@@ -154,9 +259,40 @@ def transfer(
             raise ValueError("String de conexão é obrigatória para origens SQL Server.")
         if target_type == "sqlserver" and not target_connection_string:
             raise ValueError("String de conexão é obrigatória para destinos SQL Server.")
+        if source_type == "oracle" and not source_oracle_dsn:
+            raise ValueError("DSN é obrigatório para origens Oracle.")
+        if target_type == "oracle" and not target_oracle_dsn:
+            raise ValueError("DSN é obrigatório para destinos Oracle.")
+        if source_type == "oracle" and not source_table_name_oracle:
+            raise ValueError("Nome da tabela é obrigatório para origens Oracle.")
+        if target_type == "oracle" and not target_table_name_oracle:
+            raise ValueError("Nome da tabela é obrigatório para destinos Oracle.")
+        if source_type == "bigquery" and not source_bq_credentials_file:
+            raise ValueError("Arquivo de credenciais JSON é obrigatório para origens BigQuery.")
+        if target_type == "bigquery" and not target_bq_credentials_file:
+            raise ValueError("Arquivo de credenciais JSON é obrigatório para destinos BigQuery.")
+        if source_type == "bigquery" and not source_table_name_bq:
+            raise ValueError("Nome da tabela (dataset.tabela) é obrigatório para origens BigQuery.")
+        if target_type == "bigquery" and not target_table_name_bq:
+            raise ValueError("Nome da tabela (dataset.tabela) é obrigatório para destinos BigQuery.")
 
-        reader = build_reader(source_type=source_type, table_name=source_table_name, encoding=source_encoding)
-        writer = build_writer(target_type=target_type, table_name=target_table_name, encoding=target_encoding, compression=target_compression)
+        reader = build_reader(
+            source_type=source_type,
+            table_name=source_table_name,
+            encoding=source_encoding,
+            oracle_mode=source_oracle_mode,
+            oracle_client_dir=source_oracle_client_dir,
+            bq_project_id=source_bq_project_id,
+        )
+        writer = build_writer(
+            target_type=target_type,
+            table_name=target_table_name,
+            encoding=target_encoding,
+            compression=target_compression,
+            oracle_mode=target_oracle_mode,
+            oracle_client_dir=target_oracle_client_dir,
+            bq_project_id=target_bq_project_id,
+        )
 
         service = TransferService(reader=reader, writer=writer)
         transfer_request = TransferRequest(
@@ -166,6 +302,7 @@ def transfer(
             target_sep_file=target_sep_file,
             source_encoding=source_encoding,
             target_encoding=target_encoding,
+            custom_query=source_custom_query,
         )
         result = service.execute(transfer_request)
 
