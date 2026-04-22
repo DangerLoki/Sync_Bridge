@@ -42,7 +42,8 @@ O projeto permite:
 - Estrutura em camadas com conectores desacoplados por interfaces (Ports and Adapters)
 - Tratamento de erros com exceções customizadas
 - **Logging** com rotação de arquivo (`logs/sync_bridge.log`, máx. 5 MB, 3 backups)
-- Testes de integração com `pytest`
+- **Testes unitários** para domínio, DTO, serviço e conectores (CSV, SQLite, Parquet) com mocks
+- **Testes de integração** end-to-end entre os conectores com `pytest`
 
 ## Conectores disponíveis
 
@@ -99,7 +100,20 @@ src/
       image/
 
 tests/
+  unit/
+    connectors/
+      test_csv_reader.py
+      test_csv_writer.py
+      test_sqlite_reader.py
+      test_sqlite_writer.py
+      test_parquet_reader.py
+      test_parquet_writer.py
+    test_transfer_exceptions.py
+    test_transfer_request.py
+    test_transfer_result.py
+    test_transfer_service.py
   integration/
+    test_transfer_flow.py
 
 sample_data/
 logs/
@@ -157,9 +171,36 @@ A CLI possui fluxos de demonstração pré-configurados (CSV ↔ SQLite, CSV ↔
 
 ## Como rodar os testes
 
+Rodar todos os testes:
+
 ```bash
 pytest -q
 ```
+
+Apenas testes unitários:
+
+```bash
+pytest tests/unit/ -v
+```
+
+Apenas testes de integração:
+
+```bash
+pytest tests/integration/ -v
+```
+
+### Cobertura dos testes
+
+| Módulo | Tipo | O que é testado |
+|--------|------|-----------------|
+| `TransferResult` | Unitário | Atributos, `__repr__`, `__str__`, status |
+| `TransferRequest` | Unitário | Defaults, campos customizados |
+| Exceções de domínio | Unitário | Hierarquia, mensagens, captura como `TransferError` |
+| `TransferService` | Unitário | Resultado, propagação de erros, repasse de argumentos (com mocks) |
+| `CsvReader` / `CsvWriter` | Unitário | Leitura, escrita, separador, encoding, query filter, erros |
+| `SqliteReader` / `SqliteWriter` | Unitário | Leitura, escrita, query SQL, tabela ausente, replace |
+| `ParquetReader` / `ParquetWriter` | Unitário | Leitura, escrita, compressão, arquivo corrompido, query filter |
+| Fluxos CSV ↔ SQLite ↔ Parquet | Integração | Transferências end-to-end com verificação dos dados escritos |
 
 ## Exemplo de fluxo (interface web)
 
@@ -233,7 +274,7 @@ pip install google-cloud-bigquery db-dtypes
 * logging com rotação de arquivos
 * API REST com FastAPI
 * interface web moderna com Bootstrap 5 e wizard interativo
-* testes automatizados com pytest
+* testes automatizados com pytest (unitários com mocks + integração end-to-end)
 
 ## Limitações atuais
 
