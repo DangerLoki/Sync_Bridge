@@ -36,6 +36,9 @@ bigquery = [
 ]
 dev = [
     "pytest==9.0.2",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pandas-stubs>=2.0"
 ]
 all = [
     "fastapi==0.135.1",
@@ -49,3 +52,15 @@ all = [
     "db-dtypes>=1.5,<2",
     "pytest==9.0.2",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]  # erros, warnings, imports ordenados
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
