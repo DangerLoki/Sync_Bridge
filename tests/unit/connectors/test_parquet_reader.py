@@ -61,3 +61,22 @@ class TestParquetReader:
         reader = ParquetReader()
         with pytest.raises(SourceReadError):
             reader.read(str(bad_file))
+
+    def test_read_with_columns_returns_only_selected_columns(self, tmp_path):
+        parquet_file = tmp_path / "data.parquet"
+        _write_parquet(parquet_file)
+
+        reader = ParquetReader(columns=["id", "name"])
+        df = reader.read(str(parquet_file))
+
+        assert list(df.columns) == ["id", "name"]
+        assert "age" not in df.columns
+
+    def test_read_with_invalid_column_raises_error(self, tmp_path):
+        parquet_file = tmp_path / "data.parquet"
+        _write_parquet(parquet_file)
+
+        reader = ParquetReader(columns=["nonexistent_column"])
+
+        with pytest.raises(SourceReadError):
+            reader.read(str(parquet_file))

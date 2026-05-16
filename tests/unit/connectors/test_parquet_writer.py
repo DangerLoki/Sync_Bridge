@@ -72,3 +72,23 @@ class TestParquetWriter:
 
         with pytest.raises(TargetWriteError):
             writer.write(df, "/nonexistent_dir/out.parquet")
+
+    def test_write_with_columns_filters_columns(self, tmp_path):
+        target = tmp_path / "out.parquet"
+        df = _make_df()  # tem "id" e "name"
+
+        writer = ParquetWriter(columns=["id"])
+        writer.write(df, str(target))
+
+        result = pd.read_parquet(target)
+        assert list(result.columns) == ["id"]
+        assert "name" not in result.columns
+
+    def test_write_with_invalid_column_raises_error(self, tmp_path):
+        target = tmp_path / "out.parquet"
+        df = _make_df()
+
+        writer = ParquetWriter(columns=["nonexistent_column"])
+
+        with pytest.raises(TargetWriteError):
+            writer.write(df, str(target))

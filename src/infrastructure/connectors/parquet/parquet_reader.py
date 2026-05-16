@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class ParquetReader(DataReader):
+    def __init__(self, columns: list[str] | None = None) -> None:
+        self.columns = columns
+    
     def read(self, source: str, sep_file: str = ',', custom_query: str = '') -> pd.DataFrame:
         if not os.path.exists(source):
             raise InvalidSourceError(f"Source file does not exist: {source}")
@@ -22,7 +25,8 @@ class ParquetReader(DataReader):
 
         try:
             logger.debug("Reading Parquet file: %s", source)
-            df = pd.read_parquet(source)
+            df = pd.read_parquet(source, columns=self.columns)
+            
             logger.debug("Parquet read complete: %d rows, %d columns", len(df), len(df.columns))
             if custom_query.strip():
                 logger.debug("Applying pandas filter: %s", custom_query.strip())
