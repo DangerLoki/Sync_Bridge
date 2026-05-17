@@ -73,11 +73,12 @@ def build_writer(
     oracle_mode: str = 'thin',
     oracle_client_dir: str = '',
     bq_project_id: str = '',
+    if_exists: str = 'replace',
 ):
     if target_type == "csv":
         return CsvWriter(encoding=encoding)
     if target_type == "sqlite":
-        return SqliteWriter(table_name=table_name)
+        return SqliteWriter(table_name=table_name, if_exists=if_exists)  # type: ignore[arg-type]
     if target_type == "parquet":
         return ParquetWriter(compression=compression)
     if target_type == "sqlserver":
@@ -106,6 +107,11 @@ def browse(path: str = Query(default=".")) -> JSONResponse:
             })
     except PermissionError:
         pass
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"Path not found: {str(base)}"},
+        )
     parent = str(base.parent) if base.parent != base else None
     return JSONResponse({"current": str(base), "parent": parent, "entries": entries})
 

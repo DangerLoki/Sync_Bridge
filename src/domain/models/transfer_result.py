@@ -1,17 +1,13 @@
+from dataclasses import dataclass
+
+
+@dataclass(repr=False)
 class TransferResult:
-    def __init__(
-        self,
-        source: str,
-        target: str,
-        rows_read: int,
-        rows_written: int,
-        status: str
-    ) -> None:
-        self.source = source
-        self.target = target
-        self.rows_read = rows_read
-        self.rows_written = rows_written
-        self.status = status
+    source: str
+    target: str
+    rows_read: int
+    rows_written: int
+    status: str
 
     def __repr__(self) -> str:
         return (

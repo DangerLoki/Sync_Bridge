@@ -20,8 +20,8 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev,parquet]"
 
-      - name: Rodar testes
-        run: python -m pytest -q
+      - name: Rodar testes com cobertura
+        run: python -m pytest -q --cov=src --cov-report=term-missing
 
   lint:
     runs-on: ubuntu-latest

@@ -146,7 +146,9 @@ Essa estrutura facilita a evolução do projeto para novos conectores no futuro,
 * **google-cloud-bigquery** + **db-dtypes** — conexão com BigQuery via API
 * **SQLite** (stdlib) — banco de dados local
 * **Pytest** — testes automatizados
+* **pytest-cov** — cobertura de testes (integrado ao CI)
 * **httpx** — cliente HTTP usado pelo `TestClient` do FastAPI nos testes de API
+* **Typer** — framework para CLI com argumentos de linha de comando
 * **ruff** — linter e formatador de código (usado no CI)
 * **mypy** — verificação estática de tipos (usado no CI)
 * **pandas-stubs** — stubs de tipos para pandas (usado com mypy)
@@ -224,10 +226,19 @@ O endpoint `GET /health` retorna o status da aplicação.
 A partir da raiz do projeto:
 
 ```bash
-python -m src.interfaces.cli.main
-```
+# Comando de transferência com argumentos
+python -m src.interfaces.cli.main transfer data.csv saida.db --source-type csv --target-type sqlite --table people
 
-A CLI possui fluxos de demonstração pré-configurados (CSV ↔ SQLite, CSV ↔ Parquet).
+# Estratégia de escrita
+python -m src.interfaces.cli.main transfer origem.csv destino.db --source-type csv --target-type sqlite --if-exists append
+
+# Ver ajuda
+python -m src.interfaces.cli.main --help
+python -m src.interfaces.cli.main transfer --help
+
+# Fluxos de demonstração pré-configurados
+python -m src.interfaces.cli.main demo
+```
 
 ## Como rodar os testes
 
@@ -338,8 +349,8 @@ pip install -e ".[bigquery]"
 
 ## Limitações atuais
 
-* estratégia de escrita no SQLite, SQL Server e Oracle fixa em `replace` (substitui a tabela)
-* CLI sem parâmetros de linha de comando (configuração por código)
+* estratégia de escrita configurável (`replace` ou `append`) implementada no SQLite; SQL Server e Oracle permanecem fixos em `replace`
+* CLI cobre apenas conectores locais (CSV, SQLite, Parquet); SQL Server, Oracle e BigQuery só pela interface web
 * conector SQL Server requer ODBC Driver instalado na máquina
 * conector Oracle em modo Thick requer Oracle Instant Client instalado
 * conector BigQuery requer arquivo de credenciais JSON e acesso à API do Google Cloud
