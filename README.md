@@ -146,6 +146,66 @@ Essa estrutura facilita a evolução do projeto para novos conectores no futuro,
 * **google-cloud-bigquery** + **db-dtypes** — conexão com BigQuery via API
 * **SQLite** (stdlib) — banco de dados local
 * **Pytest** — testes automatizados
+* **httpx** — cliente HTTP usado pelo `TestClient` do FastAPI nos testes de API
+* **ruff** — linter e formatador de código (usado no CI)
+* **mypy** — verificação estática de tipos (usado no CI)
+* **pandas-stubs** — stubs de tipos para pandas (usado com mypy)
+* **uv** — gerenciador de pacotes e lockfile (alternativa rápida ao pip)
+
+## Instalação
+
+### 1. Clone o repositório
+
+```bash
+git clone https://github.com/DangerLoki/Sync_Bridge.git
+cd Sync_Bridge
+```
+
+### 2. Crie e ative o ambiente virtual
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Linux / macOS
+.venv\Scripts\activate      # Windows
+```
+
+### 3. Instale as dependências
+
+Instalação básica (CSV, SQLite, interface web e CLI):
+
+```bash
+pip install -e .
+```
+
+Com suporte a Parquet:
+
+```bash
+pip install -e ".[parquet]"
+```
+
+Com dependências de desenvolvimento (testes, type checking):
+
+```bash
+pip install -e ".[dev,parquet,api]"
+```
+
+> **Alternativa com uv** (mais rápido):
+> ```bash
+> pip install uv
+> uv pip install -e ".[dev,parquet,api]"
+> ```
+> O projeto inclui `uv.lock` para instalação reproduzível:
+> ```bash
+> uv sync --extra dev --extra parquet --extra api
+> ```
+
+### 4. Verifique a instalação rodando os testes
+
+```bash
+python -m pytest -q
+```
+
+---
 
 ## Como executar
 
@@ -258,7 +318,7 @@ scott/tiger@localhost:1521/FREEPDB1
 Instale as dependências:
 
 ```bash
-pip install google-cloud-bigquery db-dtypes
+pip install -e ".[bigquery]"
 ```
 
 ## O que este projeto demonstra
