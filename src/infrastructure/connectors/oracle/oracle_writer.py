@@ -71,7 +71,9 @@ class OracleWriter(DataWriter):
         self.mode = mode
         self.client_lib_dir = client_lib_dir
 
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ",", append: bool = False) -> int:
+    def write(
+        self, data: pd.DataFrame, target: str, sep_file: str = ",", append: bool = False
+    ) -> int:
         """Escreve o DataFrame na tabela Oracle.
 
         Parameters
@@ -80,7 +82,6 @@ class OracleWriter(DataWriter):
             DSN no formato ``usuario/senha@host:porta/service_name``.
         append : bool
             Quando True, insere os dados sem recriar a tabela.
-        """
         """
         try:
             import oracledb
@@ -129,8 +130,9 @@ class OracleWriter(DataWriter):
                     insert_sql = f"INSERT INTO {qualified} VALUES ({placeholders})"
 
                     # Substitui NaN/NaT por None para que o driver envie NULL
-                    clean = data.astype(object).where(pd.notna(data),
-                                                      other=cast(Any, None))  # type: ignore[assignment]
+                    clean = data.astype(object).where(
+                        pd.notna(data), other=cast(Any, None)  # type: ignore[assignment]
+                    )
 
                     batch_size = 5000
                     rows = [

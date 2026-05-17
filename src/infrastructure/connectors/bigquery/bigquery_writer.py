@@ -24,7 +24,9 @@ class BigQueryWriter(DataWriter):
         self.table_name = table_name
         self.project_id = project_id
 
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ",", append: bool = False) -> int:
+    def write(
+        self, data: pd.DataFrame, target: str, sep_file: str = ",", append: bool = False
+    ) -> int:
         """Escreve o DataFrame na tabela BigQuery.
 
         Parameters
