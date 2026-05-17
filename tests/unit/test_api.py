@@ -123,25 +123,41 @@ def test_build_reader_tipo_invalido_levanta_erro():
         build_reader("formato_inexistente", table_name="")
 
 
-@patch("src.infrastructure.connectors.sqlserver.sqlserver_reader.SqlServerReader.__init__", return_value=None)
-def test_build_reader_sqlserver(mock_init):
-    from src.infrastructure.connectors.sqlserver.sqlserver_reader import SqlServerReader
-    reader = build_reader("sqlserver", table_name="tabela")
-    assert isinstance(reader, SqlServerReader)
+def test_build_reader_sqlserver():
+    mock_reader_cls = MagicMock()
+    mock_module = MagicMock(SqlServerReader=mock_reader_cls)
+    with patch.dict("sys.modules", {
+        "pyodbc": MagicMock(),
+        "src.infrastructure.connectors.sqlserver.sqlserver_reader": mock_module,
+    }):
+        reader = build_reader("sqlserver", table_name="tabela")
+    assert reader is mock_reader_cls.return_value
 
 
-@patch("src.infrastructure.connectors.oracle.oracle_reader.OracleReader.__init__", return_value=None)
-def test_build_reader_oracle(mock_init):
-    from src.infrastructure.connectors.oracle.oracle_reader import OracleReader
-    reader = build_reader("oracle", table_name="tabela", oracle_mode="thin")
-    assert isinstance(reader, OracleReader)
+def test_build_reader_oracle():
+    mock_reader_cls = MagicMock()
+    mock_module = MagicMock(OracleReader=mock_reader_cls)
+    with patch.dict("sys.modules", {
+        "oracledb": MagicMock(),
+        "src.infrastructure.connectors.oracle.oracle_reader": mock_module,
+    }):
+        reader = build_reader("oracle", table_name="tabela", oracle_mode="thin")
+    assert reader is mock_reader_cls.return_value
 
 
-@patch("src.infrastructure.connectors.bigquery.bigquery_reader.BigQueryReader.__init__", return_value=None)
-def test_build_reader_bigquery(mock_init):
-    from src.infrastructure.connectors.bigquery.bigquery_reader import BigQueryReader
-    reader = build_reader("bigquery", table_name="dataset.tabela", bq_project_id="proj")
-    assert isinstance(reader, BigQueryReader)
+def test_build_reader_bigquery():
+    mock_reader_cls = MagicMock()
+    mock_module = MagicMock(BigQueryReader=mock_reader_cls)
+    with patch.dict("sys.modules", {
+        "google": MagicMock(),
+        "google.cloud": MagicMock(),
+        "google.cloud.bigquery": MagicMock(),
+        "google.oauth2": MagicMock(),
+        "google.oauth2.service_account": MagicMock(),
+        "src.infrastructure.connectors.bigquery.bigquery_reader": mock_module,
+    }):
+        reader = build_reader("bigquery", table_name="dataset.tabela", bq_project_id="proj")
+    assert reader is mock_reader_cls.return_value
 
 
 # ---------------------------------------------------------------------------
@@ -171,25 +187,41 @@ def test_build_writer_tipo_invalido_levanta_erro():
         build_writer("formato_inexistente", table_name="")
 
 
-@patch("src.infrastructure.connectors.sqlserver.sqlserver_writer.SqlServerWriter.__init__", return_value=None)
-def test_build_writer_sqlserver(mock_init):
-    from src.infrastructure.connectors.sqlserver.sqlserver_writer import SqlServerWriter
-    writer = build_writer("sqlserver", table_name="tabela")
-    assert isinstance(writer, SqlServerWriter)
+def test_build_writer_sqlserver():
+    mock_writer_cls = MagicMock()
+    mock_module = MagicMock(SqlServerWriter=mock_writer_cls)
+    with patch.dict("sys.modules", {
+        "pyodbc": MagicMock(),
+        "src.infrastructure.connectors.sqlserver.sqlserver_writer": mock_module,
+    }):
+        writer = build_writer("sqlserver", table_name="tabela")
+    assert writer is mock_writer_cls.return_value
 
 
-@patch("src.infrastructure.connectors.oracle.oracle_writer.OracleWriter.__init__", return_value=None)
-def test_build_writer_oracle(mock_init):
-    from src.infrastructure.connectors.oracle.oracle_writer import OracleWriter
-    writer = build_writer("oracle", table_name="tabela", oracle_mode="thin")
-    assert isinstance(writer, OracleWriter)
+def test_build_writer_oracle():
+    mock_writer_cls = MagicMock()
+    mock_module = MagicMock(OracleWriter=mock_writer_cls)
+    with patch.dict("sys.modules", {
+        "oracledb": MagicMock(),
+        "src.infrastructure.connectors.oracle.oracle_writer": mock_module,
+    }):
+        writer = build_writer("oracle", table_name="tabela", oracle_mode="thin")
+    assert writer is mock_writer_cls.return_value
 
 
-@patch("src.infrastructure.connectors.bigquery.bigquery_writer.BigQueryWriter.__init__", return_value=None)
-def test_build_writer_bigquery(mock_init):
-    from src.infrastructure.connectors.bigquery.bigquery_writer import BigQueryWriter
-    writer = build_writer("bigquery", table_name="dataset.tabela", bq_project_id="proj")
-    assert isinstance(writer, BigQueryWriter)
+def test_build_writer_bigquery():
+    mock_writer_cls = MagicMock()
+    mock_module = MagicMock(BigQueryWriter=mock_writer_cls)
+    with patch.dict("sys.modules", {
+        "google": MagicMock(),
+        "google.cloud": MagicMock(),
+        "google.cloud.bigquery": MagicMock(),
+        "google.oauth2": MagicMock(),
+        "google.oauth2.service_account": MagicMock(),
+        "src.infrastructure.connectors.bigquery.bigquery_writer": mock_module,
+    }):
+        writer = build_writer("bigquery", table_name="dataset.tabela", bq_project_id="proj")
+    assert writer is mock_writer_cls.return_value
 
 
 # ---------------------------------------------------------------------------
