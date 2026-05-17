@@ -1,7 +1,10 @@
 import sqlite3
+from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
+from src.domain.exceptions.transfer_exceptions import TargetWriteError
 from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
 
 
@@ -73,3 +76,12 @@ class TestSqliteWriter:
 
         assert "table_a" in tables["name"].values
         assert "table_b" in tables["name"].values
+
+    def test_write_raises_target_write_error_on_failure(self, tmp_path):
+        """Erro durante to_sql deve levantar TargetWriteError."""
+        db = tmp_path / "out.db"
+        df = _make_df()
+        writer = SqliteWriter(table_name="people")
+        with patch.object(df.__class__, "to_sql", side_effect=Exception("disk full")):
+            with pytest.raises(TargetWriteError):
+                writer.write(df, str(db))

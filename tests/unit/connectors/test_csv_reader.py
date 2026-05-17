@@ -76,6 +76,15 @@ class TestCsvReader:
         df = reader.read(str(bad_file))  # reads as single column - no crash
         assert df is not None
 
+    def test_read_raises_source_read_error_on_bad_query(self, tmp_path):
+        """Query inválida dentro do try->except deve levantar SourceReadError."""
+        from src.domain.exceptions.transfer_exceptions import SourceReadError
+        csv_file = tmp_path / "data.csv"
+        _make_csv(csv_file)
+        reader = CsvReader()
+        with pytest.raises(SourceReadError):
+            reader.read(str(csv_file), custom_query="invalid syntax !!!$$$")
+
     def test_custom_encoding_is_used(self, tmp_path):
         csv_file = tmp_path / "data.csv"
         df = pd.DataFrame({"nome": ["André", "Luís"]})

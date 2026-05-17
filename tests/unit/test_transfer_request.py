@@ -48,3 +48,13 @@ class TestTransferRequest:
         )
 
         assert request.custom_query == "age > 18"
+
+    def test_empty_source_raises_value_error(self):
+        import pytest
+        with pytest.raises(ValueError, match="source cannot be empty"):
+            TransferRequest(source="   ", target="out.csv")
+
+    def test_empty_target_raises_value_error(self):
+        import pytest
+        with pytest.raises(ValueError, match="target cannot be empty"):
+            TransferRequest(source="in.csv", target="   ")
