@@ -17,12 +17,15 @@ def setup_logging(level: int = logging.INFO) -> None:
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
 
-    file_handler = logging.handlers.RotatingFileHandler(
+    file_handler = logging.handlers.TimedRotatingFileHandler(
         LOG_FILE,
-        maxBytes=5 * 1024 * 1024,  # 5 MB
-        backupCount=3,
+        when="midnight",      # rotaciona à meia-noite
+        interval=1,           # a cada 1 dia
+        backupCount=30,       # mantém os últimos 30 dias
         encoding="utf-8",
+        utc=False,
     )
+    file_handler.suffix = "%Y-%m-%d"   # ex: sync_bridge.log.2026-05-16
     file_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
