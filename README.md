@@ -1,6 +1,12 @@
 # SyncBridge
 
-Ferramenta modular para transferência de dados tabulares entre arquivos e bancos de dados, com foco em arquitetura em camadas, abstração de conectores e fluxos reproduzíveis.
+[![CI](https://github.com/DangerLoki/Sync_Bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/DangerLoki/Sync_Bridge/actions/workflows/ci.yml)
+
+Ferramenta **local** de transferência de dados tabulares entre arquivos e bancos de dados. Roda na máquina do desenvolvedor — não é um serviço de rede exposto, não possui endpoints públicos e não foi projetado para acesso remoto.
+
+## ⚠️ Uso local apenas
+
+Este projeto **não é um serviço web de produção**. A interface web (FastAPI) existe como conveniência para uso local via navegador (`localhost`). O projeto não possui autenticação, controle de acesso ou qualquer mecanismo de segurança para exposição pública. **Não exponha à internet nem utilize em ambientes multiusuário.**
 
 ## Objetivo do projeto
 
@@ -226,29 +232,47 @@ Acesse `http://localhost:8000` no navegador para usar o wizard de transferência
 
 O endpoint `GET /health` retorna o status da aplicação.
 
-### Docker
+### Rodando com docker-compose
 
-O projeto inclui um `Dockerfile` multi-stage com dois targets: `api` e `cli`.
-
-**API via docker-compose (recomendado):**
+A forma mais simples de subir a interface web é via `docker-compose`. O arquivo `docker-compose.yml` já configura a porta, os volumes e o healthcheck.
 
 ```bash
 docker compose up --build
 ```
 
-**API diretamente:**
+Acesse `http://localhost:8000` após o container subir.
+
+Para parar:
+
+```bash
+docker compose down
+```
+
+O volume `./logs` é mapeado automaticamente, mantendo os logs persistidos no host.
+
+### Rodando com Docker
+
+O projeto inclui um `Dockerfile` multi-stage com dois targets: `api` e `cli`.
+
+**API:**
 
 ```bash
 docker build --target api -t sync-bridge-api .
-docker run -p 8000:8000 -v ./sample_data:/app/sample_data sync-bridge-api
+docker run -p 8000:8000 \
+  -v ./sample_data:/app/sample_data \
+  -v ./logs:/app/logs \
+  sync-bridge-api
 ```
 
 Acesse `http://localhost:8000` após o container subir.
 
-**CLI via Docker:**
+**CLI:**
 
 ```bash
 docker build --target cli -t sync-bridge-cli .
+
+# Ver ajuda
+docker run --rm sync-bridge-cli --help
 
 # Fluxo de demonstração
 docker run --rm -v ./sample_data:/app/sample_data sync-bridge-cli demo
@@ -392,6 +416,7 @@ pip install -e ".[bigquery]"
 
 ## Limitações atuais
 
+* **projeto para uso local apenas** — sem autenticação, autorização ou proteção contra acesso externo
 * estratégia de escrita configurável (`replace` ou `append`) implementada no SQLite; SQL Server e Oracle permanecem fixos em `replace`
 * CLI cobre apenas conectores locais (CSV, SQLite, Parquet); SQL Server, Oracle e BigQuery só pela interface web
 * conector SQL Server requer ODBC Driver instalado na máquina
@@ -400,8 +425,6 @@ pip install -e ".[bigquery]"
 
 ## Próximos passos
 
-* adicionar argumentos de linha de comando na CLI (`argparse` ou `typer`)
-* suportar estratégias de escrita como `append`
 * expandir conectores (ex: Excel, PostgreSQL, MySQL)
 * evoluir a estrutura de configuração da transferência
 
