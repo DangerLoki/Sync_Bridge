@@ -1,28 +1,29 @@
 import logging
 from pathlib import Path
+from typing import cast
 
 from fastapi import FastAPI, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from src.core.logging_config import setup_logging
 from src.application.dto.transfer_request import TransferRequest
 from src.application.services.transfer_service import TransferService
+from src.core.logging_config import setup_logging
 from src.domain.exceptions.transfer_exceptions import TransferError
-from src.infrastructure.connectors.csv.csv_reader import CsvReader
-from src.infrastructure.connectors.csv.csv_writer import CsvWriter
-from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
-from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
-from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
-from src.infrastructure.connectors.parquet.parquet_writer import ParquetWriter
-from src.infrastructure.connectors.sqlserver.sqlserver_reader import SqlServerReader
-from src.infrastructure.connectors.sqlserver.sqlserver_writer import SqlServerWriter
-from src.infrastructure.connectors.oracle.oracle_reader import OracleReader
-from src.infrastructure.connectors.oracle.oracle_writer import OracleWriter
 from src.infrastructure.connectors.bigquery.bigquery_reader import BigQueryReader
 from src.infrastructure.connectors.bigquery.bigquery_writer import BigQueryWriter
- 
+from src.infrastructure.connectors.csv.csv_reader import CsvReader
+from src.infrastructure.connectors.csv.csv_writer import CsvWriter
+from src.infrastructure.connectors.oracle.oracle_reader import OracleReader
+from src.infrastructure.connectors.oracle.oracle_writer import OracleWriter
+from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
+from src.infrastructure.connectors.parquet.parquet_writer import ParquetCompression, ParquetWriter
+from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
+from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
+from src.infrastructure.connectors.sqlserver.sqlserver_reader import SqlServerReader
+from src.infrastructure.connectors.sqlserver.sqlserver_writer import SqlServerWriter
+
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -55,9 +56,12 @@ def build_reader(
     if source_type == "sqlserver":
         return SqlServerReader(table_name=table_name)
     if source_type == "oracle":
-        return OracleReader(table_name=table_name, mode=oracle_mode, client_lib_dir=oracle_client_dir)
+        return OracleReader(table_name=table_name,
+                            mode=oracle_mode,
+                            client_lib_dir=oracle_client_dir)
     if source_type == "bigquery":
-        return BigQueryReader(table_name=table_name, project_id=bq_project_id)
+        return BigQueryReader(table_name=table_name,
+                              project_id=bq_project_id)
     raise ValueError(f"Unsupported source type: {source_type}")
  
  
@@ -65,7 +69,7 @@ def build_writer(
     target_type: str,
     table_name: str,
     encoding: str = 'utf-8-sig',
-    compression: str = 'snappy',
+    compression: ParquetCompression = 'snappy',
     oracle_mode: str = 'thin',
     oracle_client_dir: str = '',
     bq_project_id: str = '',
@@ -79,9 +83,12 @@ def build_writer(
     if target_type == "sqlserver":
         return SqlServerWriter(table_name=table_name)
     if target_type == "oracle":
-        return OracleWriter(table_name=table_name, mode=oracle_mode, client_lib_dir=oracle_client_dir)
+        return OracleWriter(table_name=table_name,
+                            mode=oracle_mode,
+                            client_lib_dir=oracle_client_dir)
     if target_type == "bigquery":
-        return BigQueryWriter(table_name=table_name, project_id=bq_project_id)
+        return BigQueryWriter(table_name=table_name,
+                              project_id=bq_project_id)
     raise ValueError(f"Unsupported target type: {target_type}")
  
  
@@ -272,9 +279,11 @@ def transfer(
         if target_type == "bigquery" and not target_bq_credentials_file:
             raise ValueError("Arquivo de credenciais JSON é obrigatório para destinos BigQuery.")
         if source_type == "bigquery" and not source_table_name_bq:
-            raise ValueError("Nome da tabela (dataset.tabela) é obrigatório para origens BigQuery.")
+            raise ValueError("Nome da tabela (dataset.tabela) é obrigatório "
+                             "para origens BigQuery.")
         if target_type == "bigquery" and not target_table_name_bq:
-            raise ValueError("Nome da tabela (dataset.tabela) é obrigatório para destinos BigQuery.")
+            raise ValueError("Nome da tabela (dataset.tabela) é obrigatório "
+                             "para destinos BigQuery.")
 
         reader = build_reader(
             source_type=source_type,
@@ -288,7 +297,7 @@ def transfer(
             target_type=target_type,
             table_name=target_table_name,
             encoding=target_encoding,
-            compression=target_compression,
+            compression=cast(ParquetCompression, target_compression),
             oracle_mode=target_oracle_mode,
             oracle_client_dir=target_oracle_client_dir,
             bq_project_id=target_bq_project_id,
@@ -306,7 +315,10 @@ def transfer(
         )
         result = service.execute(transfer_request)
 
-        logger.info("Transfer completed: %d rows read, %d rows written", result.rows_read, result.rows_written)
+        logger.info("Transfer completed: %d rows read, %d rows written",
+                    result.rows_read,
+                    result.rows_written)
+        
         return templates.TemplateResponse(
             request=request,
             name="index.html",

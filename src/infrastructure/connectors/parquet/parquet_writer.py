@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 
 import pandas as pd
 
@@ -6,16 +7,23 @@ from src.domain.exceptions.transfer_exceptions import TargetWriteError
 from src.domain.ports.data_writer import DataWriter
 
 logger = logging.getLogger(__name__)
-
+ParquetCompression = Literal['snappy', 'gzip', 'brotli', 'lz4', 'zstd', None]
 
 class ParquetWriter(DataWriter):
-    def __init__(self, compression: str = 'snappy', columns: list[str] | None = None) -> None:
+    def __init__(self,
+                 compression: ParquetCompression = 'snappy',
+                 columns: list[str] | None = None
+                 ) -> None:
+        
         self.compression = compression
         self.columns = columns
 
     def write(self, data: pd.DataFrame, target: str, sep_file: str = ',') -> int:
         try:
-            logger.debug("Writing %d rows to Parquet file: %s (compression=%s)", len(data), target, self.compression)
+            logger.debug("Writing %d rows to Parquet file: %s (compression=%s)",
+                         len(data),
+                         target,
+                         self.compression)
             if self.columns:
                 data = data[self.columns]
             

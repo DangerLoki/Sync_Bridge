@@ -1,9 +1,7 @@
 import sqlite3
-import pandas as pd
-import pytest
-from pathlib import Path
 
-from src.domain.exceptions.transfer_exceptions import TargetWriteError
+import pandas as pd
+
 from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
 
 

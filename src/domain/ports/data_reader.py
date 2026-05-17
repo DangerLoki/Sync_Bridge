@@ -1,5 +1,9 @@
+#imports da biblioteca padrão
 from abc import ABC, abstractmethod
+
+#imports de bibliotecas de externas
 import pandas as pd
+
 
 class DataReader(ABC):
     @abstractmethod

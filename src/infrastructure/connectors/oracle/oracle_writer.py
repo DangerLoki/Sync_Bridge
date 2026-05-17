@@ -1,4 +1,5 @@
 import logging
+from typing import Any, cast
 
 import pandas as pd
 
@@ -124,7 +125,8 @@ class OracleWriter(DataWriter):
                     insert_sql = f"INSERT INTO {qualified} VALUES ({placeholders})"
 
                     # Substitui NaN/NaT por None para que o driver envie NULL
-                    clean = data.astype(object).where(pd.notna(data), other=None)
+                    clean = data.astype(object).where(pd.notna(data),
+                                                      other=cast(Any, None))  # type: ignore[assignment]
 
                     batch_size = 5000
                     rows = [

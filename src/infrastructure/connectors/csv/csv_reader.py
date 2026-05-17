@@ -1,12 +1,12 @@
 import logging
 import os
+
 import pandas as pd
 
 from src.domain.exceptions.transfer_exceptions import (
     InvalidSourceError,
     SourceReadError,
 )
-
 from src.domain.ports.data_reader import DataReader
 
 logger = logging.getLogger(__name__)

@@ -9,10 +9,10 @@ from src.application.services.transfer_service import TransferService
 from src.domain.exceptions.transfer_exceptions import InvalidSourceError
 from src.infrastructure.connectors.csv.csv_reader import CsvReader
 from src.infrastructure.connectors.csv.csv_writer import CsvWriter
-from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
-from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
 from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
 from src.infrastructure.connectors.parquet.parquet_writer import ParquetWriter
+from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
+from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
 
 
 def create_sample_csv(file_path: Path) -> pd.DataFrame:

@@ -1,4 +1,3 @@
-import pytest
 
 from src.domain.models.transfer_result import TransferResult
 

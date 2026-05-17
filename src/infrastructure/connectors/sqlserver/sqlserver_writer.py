@@ -1,6 +1,8 @@
 import logging
-import pyodbc
+from typing import Any, cast
+
 import pandas as pd
+import pyodbc
 
 from src.domain.exceptions.transfer_exceptions import TargetWriteError
 from src.domain.ports.data_writer import DataWriter
@@ -63,7 +65,10 @@ class SqlServerWriter(DataWriter):
                     # produces Python None (not numpy nan), which pyodbc sends as NULL.
                     # Using only pd.notna().where() on float64 columns keeps the float
                     # dtype and itertuples still yields float('nan'), causing error 8023.
-                    clean = data.astype(object).where(pd.notna(data), other=None)
+                    clean = data.astype(object).where(
+                        pd.notna(data),
+                        other=cast(Any, None)  # type: ignore[assignment]
+                    )
 
                     batch_size = 10000
                     rows = [tuple(row) for row in clean.itertuples(index=False, name=None)]

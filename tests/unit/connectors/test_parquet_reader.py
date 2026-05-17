@@ -1,6 +1,7 @@
+from pathlib import Path
+
 import pandas as pd
 import pytest
-from pathlib import Path
 
 from src.domain.exceptions.transfer_exceptions import InvalidSourceError, SourceReadError
 from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader

@@ -1,8 +1,9 @@
-import pytest
-import pandas as pd
 from pathlib import Path
 
-from src.domain.exceptions.transfer_exceptions import InvalidSourceError, SourceReadError
+import pandas as pd
+import pytest
+
+from src.domain.exceptions.transfer_exceptions import InvalidSourceError
 from src.infrastructure.connectors.csv.csv_reader import CsvReader
 
 

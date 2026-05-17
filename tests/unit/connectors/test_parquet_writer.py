@@ -1,6 +1,6 @@
+
 import pandas as pd
 import pytest
-from pathlib import Path
 
 from src.domain.exceptions.transfer_exceptions import TargetWriteError
 from src.infrastructure.connectors.parquet.parquet_writer import ParquetWriter
