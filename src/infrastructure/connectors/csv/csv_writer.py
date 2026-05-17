@@ -1,4 +1,5 @@
 import logging
+from typing import Literal, cast
 
 import pandas as pd
 
@@ -20,7 +21,7 @@ class CsvWriter(DataWriter):
         append: bool = False,
     ) -> int:
         try:
-            mode = 'a' if append else 'w'
+            mode = cast("Literal['a', 'w']", 'a' if append else 'w')
             header = not append
             logger.debug(
                 "Writing %d rows to CSV file: %s (mode=%s)", len(data), target, mode

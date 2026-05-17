@@ -1,5 +1,5 @@
 import logging
-from typing import Literal
+from typing import Any, Literal
 
 import pandas as pd
 
@@ -25,7 +25,7 @@ class ParquetWriter(DataWriter):
     ) -> None:
         self.compression = compression
         self.columns = columns
-        self._pq_writer = None  # pyarrow.parquet.ParquetWriter | None
+        self._pq_writer: Any = None  # pyarrow.parquet.ParquetWriter | None
 
     def write(
         self,
