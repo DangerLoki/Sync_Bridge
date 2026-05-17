@@ -117,6 +117,9 @@ tests/
 
 sample_data/
 logs/
+Dockerfile
+docker-compose.yml
+.dockerignore
 ```
 
 ## Arquitetura
@@ -153,6 +156,8 @@ Essa estrutura facilita a evolução do projeto para novos conectores no futuro,
 * **mypy** — verificação estática de tipos (usado no CI)
 * **pandas-stubs** — stubs de tipos para pandas (usado com mypy)
 * **uv** — gerenciador de pacotes e lockfile (alternativa rápida ao pip)
+* **Docker** — containerização da aplicação (API e CLI)
+* **GitHub Actions** — CI com testes, lint e validação do container Docker
 
 ## Instalação
 
@@ -220,6 +225,40 @@ uvicorn src.interfaces.api.app:app --reload
 Acesse `http://localhost:8000` no navegador para usar o wizard de transferência.
 
 O endpoint `GET /health` retorna o status da aplicação.
+
+### Docker
+
+O projeto inclui um `Dockerfile` multi-stage com dois targets: `api` e `cli`.
+
+**API via docker-compose (recomendado):**
+
+```bash
+docker compose up --build
+```
+
+**API diretamente:**
+
+```bash
+docker build --target api -t sync-bridge-api .
+docker run -p 8000:8000 -v ./sample_data:/app/sample_data sync-bridge-api
+```
+
+Acesse `http://localhost:8000` após o container subir.
+
+**CLI via Docker:**
+
+```bash
+docker build --target cli -t sync-bridge-cli .
+
+# Fluxo de demonstração
+docker run --rm -v ./sample_data:/app/sample_data sync-bridge-cli demo
+
+# Transferência manual
+docker run --rm -v ./sample_data:/app/sample_data sync-bridge-cli transfer \
+  sample_data/people.csv sample_data/out.db --source-type csv --target-type sqlite --table people
+```
+
+> **Volumes:** os arquivos CSV, SQLite e Parquet precisam estar acessíveis dentro do container. Use `-v ./sample_data:/app/sample_data` para mapear a pasta do host.
 
 ### CLI
 
@@ -295,7 +334,9 @@ O projeto possui tratamento para cenários como:
 
 ## Logging
 
-Os logs são gravados simultaneamente no console e no arquivo `logs/sync_bridge.log`, com rotação automática a cada 5 MB (até 3 arquivos de backup).
+Os logs são gravados simultaneamente no console e no arquivo `logs/sync_bridge.log`, com **rotação diária à meia-noite** (mantém os últimos 30 dias).
+
+Arquivos rotacionados recebem o sufixo da data: `sync_bridge.log.2026-05-16`
 
 Formato: `%(asctime)s | %(levelname)-8s | %(name)s | %(message)s`
 
@@ -342,10 +383,12 @@ pip install -e ".[bigquery]"
 * leitura e escrita entre múltiplos formatos e bancos de dados (CSV, SQLite, Parquet, SQL Server, Oracle, BigQuery)
 * consulta personalizada na leitura (SQL nativo ou expressão pandas)
 * tratamento de erros com exceções customizadas
-* logging com rotação de arquivos
+* logging com rotação diária de arquivos
 * API REST com FastAPI
 * interface web moderna com Bootstrap 5 e wizard interativo
 * testes automatizados com pytest (unitários com mocks + integração end-to-end)
+* containerização com Docker (multi-stage build para API e CLI)
+* CI/CD com GitHub Actions (testes, lint, mypy e validação do container Docker)
 
 ## Limitações atuais
 
