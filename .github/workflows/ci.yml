@@ -33,3 +33,24 @@ jobs:
       - run: pip install ruff mypy pandas-stubs
       - run: ruff check src/
       - run: mypy src/
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build da imagem Docker (target api)
+        run: docker build --target api -t sync-bridge-api:ci .
+
+      - name: Subir container em background
+        run: |
+          docker run -d --name sync-bridge-test -p 8000:8000 sync-bridge-api:ci
+          sleep 5  # aguarda o uvicorn inicializar
+
+      - name: Testar endpoint /health
+        run: |
+          curl --fail --silent --show-error http://localhost:8000/health
+
+      - name: Derrubar container
+        if: always()
+        run: docker rm -f sync-bridge-test

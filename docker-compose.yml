@@ -1,0 +1,13 @@
+services:
+  api:
+    build:
+      context: .
+      target: api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sample_data:/app/sample_data   # arquivos CSV, SQLite, Parquet
+      - ./logs:/app/logs                 # logs persistidos no host
+    environment:
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
