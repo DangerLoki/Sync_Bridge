@@ -11,18 +11,12 @@ from src.application.dto.transfer_request import TransferRequest
 from src.application.services.transfer_service import TransferService
 from src.core.logging_config import setup_logging
 from src.domain.exceptions.transfer_exceptions import TransferError
-from src.infrastructure.connectors.bigquery.bigquery_reader import BigQueryReader
-from src.infrastructure.connectors.bigquery.bigquery_writer import BigQueryWriter
 from src.infrastructure.connectors.csv.csv_reader import CsvReader
 from src.infrastructure.connectors.csv.csv_writer import CsvWriter
-from src.infrastructure.connectors.oracle.oracle_reader import OracleReader
-from src.infrastructure.connectors.oracle.oracle_writer import OracleWriter
 from src.infrastructure.connectors.parquet.parquet_reader import ParquetReader
 from src.infrastructure.connectors.parquet.parquet_writer import ParquetCompression, ParquetWriter
 from src.infrastructure.connectors.sqlite.sqlite_reader import SqliteReader
 from src.infrastructure.connectors.sqlite.sqlite_writer import SqliteWriter
-from src.infrastructure.connectors.sqlserver.sqlserver_reader import SqlServerReader
-from src.infrastructure.connectors.sqlserver.sqlserver_writer import SqlServerWriter
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -54,12 +48,15 @@ def build_reader(
     if source_type == "parquet":
         return ParquetReader()
     if source_type == "sqlserver":
+        from src.infrastructure.connectors.sqlserver.sqlserver_reader import SqlServerReader
         return SqlServerReader(table_name=table_name)
     if source_type == "oracle":
+        from src.infrastructure.connectors.oracle.oracle_reader import OracleReader
         return OracleReader(table_name=table_name,
                             mode=oracle_mode,
                             client_lib_dir=oracle_client_dir)
     if source_type == "bigquery":
+        from src.infrastructure.connectors.bigquery.bigquery_reader import BigQueryReader
         return BigQueryReader(table_name=table_name,
                               project_id=bq_project_id)
     raise ValueError(f"Unsupported source type: {source_type}")
@@ -82,12 +79,15 @@ def build_writer(
     if target_type == "parquet":
         return ParquetWriter(compression=compression)
     if target_type == "sqlserver":
+        from src.infrastructure.connectors.sqlserver.sqlserver_writer import SqlServerWriter
         return SqlServerWriter(table_name=table_name)
     if target_type == "oracle":
+        from src.infrastructure.connectors.oracle.oracle_writer import OracleWriter
         return OracleWriter(table_name=table_name,
                             mode=oracle_mode,
                             client_lib_dir=oracle_client_dir)
     if target_type == "bigquery":
+        from src.infrastructure.connectors.bigquery.bigquery_writer import BigQueryWriter
         return BigQueryWriter(table_name=table_name,
                               project_id=bq_project_id)
     raise ValueError(f"Unsupported target type: {target_type}")
