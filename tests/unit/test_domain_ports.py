@@ -14,8 +14,8 @@ class _ConcreteReader(DataReader):
 
 class _ConcreteWriter(DataWriter):
     """Subclass that delegates to super() so the abstract body is executed."""
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ',') -> int:
-        return super().write(data, target, sep_file)
+    def write(self, data: pd.DataFrame, target: str, sep_file: str = ',', append: bool = False) -> int:
+        return super().write(data, target, sep_file, append)
 
 
 class TestDataReaderPort:

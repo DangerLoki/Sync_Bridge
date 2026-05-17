@@ -22,39 +22,50 @@ class SqlServerWriter(DataWriter):
     def __init__(self, table_name: str) -> None:
         self.table_name = table_name
 
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ',') -> int:
+    def write(
+        self,
+        data: pd.DataFrame,
+        target: str,
+        sep_file: str = ',',
+        append: bool = False,
+    ) -> int:
         try:
-            logger.debug("Writing %d rows to SQL Server table '%s'", len(data), self.table_name)
+            logger.debug(
+                "Writing %d rows to SQL Server table '%s' (append=%s)",
+                len(data), self.table_name, append,
+            )
             with pyodbc.connect(target) as connection:
                 cursor = connection.cursor()
                 # Bulk copy mode: sends all rows in a single TDS batch instead of
                 # one RPC call per row. Equivalent to using the BCP protocol.
                 cursor.fast_executemany = True
 
-                # Drop and recreate table to match "replace" behavior
                 qualified = _qualify(self.table_name)
-                cursor.execute(
-                    f"IF OBJECT_ID(N'{qualified}', N'U') IS NOT NULL "
-                    f"DROP TABLE {qualified}"
-                )
 
-                # Build CREATE TABLE from DataFrame dtypes
-                col_defs = []
-                for col_name, dtype in data.dtypes.items():
-                    if pd.api.types.is_integer_dtype(dtype):
-                        sql_type = "BIGINT"
-                    elif pd.api.types.is_float_dtype(dtype):
-                        sql_type = "FLOAT"
-                    elif pd.api.types.is_bool_dtype(dtype):
-                        sql_type = "BIT"
-                    elif pd.api.types.is_datetime64_any_dtype(dtype):
-                        sql_type = "DATETIME2"
-                    else:
-                        sql_type = "NVARCHAR(MAX)"
-                    col_defs.append(f"[{col_name}] {sql_type}")
+                if not append:
+                    # Drop and recreate table to match "replace" behavior
+                    cursor.execute(
+                        f"IF OBJECT_ID(N'{qualified}', N'U') IS NOT NULL "
+                        f"DROP TABLE {qualified}"
+                    )
 
-                create_sql = f"CREATE TABLE {qualified} ({', '.join(col_defs)})"
-                cursor.execute(create_sql)
+                    # Build CREATE TABLE from DataFrame dtypes
+                    col_defs = []
+                    for col_name, dtype in data.dtypes.items():
+                        if pd.api.types.is_integer_dtype(dtype):
+                            sql_type = "BIGINT"
+                        elif pd.api.types.is_float_dtype(dtype):
+                            sql_type = "FLOAT"
+                        elif pd.api.types.is_bool_dtype(dtype):
+                            sql_type = "BIT"
+                        elif pd.api.types.is_datetime64_any_dtype(dtype):
+                            sql_type = "DATETIME2"
+                        else:
+                            sql_type = "NVARCHAR(MAX)"
+                        col_defs.append(f"[{col_name}] {sql_type}")
+
+                    create_sql = f"CREATE TABLE {qualified} ({', '.join(col_defs)})"
+                    cursor.execute(create_sql)
 
                 # Insert rows in batches using parameterized queries
                 if not data.empty:

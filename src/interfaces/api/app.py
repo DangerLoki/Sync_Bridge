@@ -225,6 +225,7 @@ def transfer(
     source_table_name_bq: str = Form(''),
     target_table_name_bq: str = Form(''),
     source_custom_query: str = Form(''),
+    chunk_size: int = Form(0),
 ):
     # For SQL Server, the connection string replaces the file path
     if source_type == "sqlserver" and source_connection_string:
@@ -318,6 +319,7 @@ def transfer(
             source_encoding=source_encoding,
             target_encoding=target_encoding,
             custom_query=source_custom_query,
+            chunk_size=chunk_size,
         )
         result = service.execute(transfer_request)
 

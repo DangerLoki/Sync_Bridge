@@ -95,7 +95,7 @@ class TestTransferService:
         request = TransferRequest(source="s.csv", target="t.csv", target_sep_file="|")
         service.execute(request)
 
-        writer.write.assert_called_once_with(df, "t.csv", sep_file="|")
+        writer.write.assert_called_once_with(df, "t.csv", sep_file="|", append=False)
 
     def test_execute_passes_custom_query_to_reader(self):
         reader = MagicMock()

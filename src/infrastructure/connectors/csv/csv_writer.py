@@ -12,10 +12,27 @@ class CsvWriter(DataWriter):
     def __init__(self, encoding: str = 'utf-8-sig') -> None:
         self.encoding = encoding
 
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ',') -> int:
+    def write(
+        self,
+        data: pd.DataFrame,
+        target: str,
+        sep_file: str = ',',
+        append: bool = False,
+    ) -> int:
         try:
-            logger.debug("Writing %d rows to CSV file: %s", len(data), target)
-            data.to_csv(target, index=False, sep=sep_file, encoding=self.encoding)
+            mode = 'a' if append else 'w'
+            header = not append
+            logger.debug(
+                "Writing %d rows to CSV file: %s (mode=%s)", len(data), target, mode
+            )
+            data.to_csv(
+                target,
+                index=False,
+                sep=sep_file,
+                encoding=self.encoding,
+                mode=mode,
+                header=header,
+            )
             logger.debug("CSV write complete: %s", target)
             return len(data)
         except Exception as exc:

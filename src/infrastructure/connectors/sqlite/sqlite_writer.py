@@ -17,14 +17,28 @@ class SqliteWriter(DataWriter):
         self.table_name = table_name
         self.if_exists = if_exists
 
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ',') -> int:
+    def write(
+        self,
+        data: pd.DataFrame,
+        target: str,
+        sep_file: str = ',',
+        append: bool = False,
+    ) -> int:
+        # When called with append=True (i.e. mid-transfer chunk), always append
+        # regardless of the constructor-level if_exists setting.
+        effective_if_exists: IfExists = "append" if append else self.if_exists
         try:
             logger.debug(
                 "Writing %d rows to SQLite table '%s' (if_exists=%s): %s",
-                len(data), self.table_name, self.if_exists, target,
+                len(data), self.table_name, effective_if_exists, target,
             )
             with sqlite3.connect(target) as connection:
-                data.to_sql(self.table_name, connection, if_exists=self.if_exists, index=False)
+                data.to_sql(
+                    self.table_name,
+                    connection,
+                    if_exists=effective_if_exists,
+                    index=False,
+                )
             logger.debug("SQLite write complete: table '%s' in '%s'", self.table_name, target)
             return len(data)
         except Exception as exc:

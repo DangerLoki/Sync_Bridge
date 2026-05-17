@@ -15,6 +15,7 @@ class TestParquetWriter:
         target = tmp_path / "out.parquet"
         writer = ParquetWriter()
         writer.write(_make_df(), str(target))
+        writer.close()
 
         assert target.exists()
 
@@ -22,6 +23,7 @@ class TestParquetWriter:
         target = tmp_path / "out.parquet"
         writer = ParquetWriter()
         rows = writer.write(_make_df(), str(target))
+        writer.close()
 
         assert rows == 3
 
@@ -31,6 +33,7 @@ class TestParquetWriter:
 
         writer = ParquetWriter()
         writer.write(df, str(target))
+        writer.close()
 
         result = pd.read_parquet(target)
         pd.testing.assert_frame_equal(df, result)
@@ -41,6 +44,7 @@ class TestParquetWriter:
 
         writer = ParquetWriter()
         rows = writer.write(df, str(target))
+        writer.close()
 
         assert rows == 0
         assert target.exists()
@@ -51,6 +55,7 @@ class TestParquetWriter:
 
         writer = ParquetWriter(compression="snappy")
         rows = writer.write(df, str(target))
+        writer.close()
 
         assert rows == 3
         assert pd.read_parquet(target).shape == (3, 2)
@@ -61,6 +66,7 @@ class TestParquetWriter:
 
         writer = ParquetWriter(compression="gzip")
         rows = writer.write(df, str(target))
+        writer.close()
 
         assert rows == 3
         result = pd.read_parquet(target)
@@ -79,6 +85,7 @@ class TestParquetWriter:
 
         writer = ParquetWriter(columns=["id"])
         writer.write(df, str(target))
+        writer.close()
 
         result = pd.read_parquet(target)
         assert list(result.columns) == ["id"]

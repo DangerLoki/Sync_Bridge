@@ -24,13 +24,15 @@ class BigQueryWriter(DataWriter):
         self.table_name = table_name
         self.project_id = project_id
 
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ",") -> int:
+    def write(self, data: pd.DataFrame, target: str, sep_file: str = ",", append: bool = False) -> int:
         """Escreve o DataFrame na tabela BigQuery.
 
         Parameters
         ----------
         target : str
             Caminho absoluto para o arquivo de credenciais JSON da conta de serviço.
+        append : bool
+            Quando True, usa ``WRITE_APPEND`` em vez de ``WRITE_TRUNCATE``.
         """
         try:
             from google.cloud import bigquery
@@ -55,13 +57,17 @@ class BigQueryWriter(DataWriter):
                 table_ref = f"{project}.{table_ref}"
 
             job_config = bigquery.LoadJobConfig(
-                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                write_disposition=(
+                    bigquery.WriteDisposition.WRITE_APPEND
+                    if append
+                    else bigquery.WriteDisposition.WRITE_TRUNCATE
+                ),
                 autodetect=True,
             )
 
             logger.debug(
-                "Escrevendo %d linhas na tabela BigQuery '%s' (project=%s)",
-                len(data), table_ref, project,
+                "Escrevendo %d linhas na tabela BigQuery '%s' (project=%s, append=%s)",
+                len(data), table_ref, project, append,
             )
             job = client.load_table_from_dataframe(data, table_ref, job_config=job_config)
             job.result()  # aguarda conclusão

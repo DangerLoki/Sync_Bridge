@@ -259,6 +259,18 @@ document.addEventListener('DOMContentLoaded', () => {
               + '  <pre class="mb-0 small bg-white p-2 rounded border" style="white-space:pre-wrap">' + esc(customQ.trim()) + '</pre>'
               + '</div>';
         }
+
+        // Adiciona chunk_size ao resumo
+        const chunkSize = parseInt((document.getElementById('chunk_size') || {}).value || '0', 10);
+        if (chunkSize > 0) {
+            document.getElementById('summary-content').innerHTML +=
+                '<div class="mt-3 p-3 bg-body-secondary rounded-3">'
+              + '  <div class="d-flex align-items-center gap-2">'
+              + '    <i class="bi bi-layers text-primary"></i>'
+              + '    <strong>Modo streaming:</strong>&nbsp;' + esc(String(chunkSize)) + ' linhas por chunk'
+              + '  </div>'
+              + '</div>';
+        }
     }
 
     window.nextStep = function (current) {
@@ -279,13 +291,34 @@ document.addEventListener('DOMContentLoaded', () => {
     let _targetFieldId = null;
     let _selectedPath  = null;
     let _modal         = null;
+    let _writeMode     = false;
+    let _currentDir    = '.';
 
-    window.openBrowser = function (fieldId) {
+    window.openBrowser = function (fieldId, writeMode) {
         _targetFieldId = fieldId;
         _selectedPath  = null;
+        _writeMode     = !!writeMode;
 
         if (!_modal) {
             _modal = new bootstrap.Modal(document.getElementById('fileBrowserModal'));
+        }
+
+        // Show / hide write-mode filename row
+        const writeRow = document.getElementById('browser-write-row');
+        const filenameInput = document.getElementById('browser-filename-input');
+        const modalTitle = document.querySelector('#fileBrowserModal .modal-title');
+        if (_writeMode) {
+            writeRow.classList.remove('d-none');
+            filenameInput.value = '';
+            if (modalTitle) modalTitle.textContent = 'Escolher pasta de destino';
+            // Enable select btn as soon as the user types a filename
+            filenameInput.oninput = function () {
+                document.getElementById('browser-select-btn').disabled = !filenameInput.value.trim();
+            };
+        } else {
+            writeRow.classList.add('d-none');
+            if (modalTitle) modalTitle.textContent = 'Navegar arquivos';
+            filenameInput.oninput = null;
         }
 
         // Start from current field value or working dir
@@ -304,7 +337,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         fetch('/browse?path=' + encodeURIComponent(path))
             .then(r => r.json())
-            .then(data => renderDir(data))
+            .then(data => {
+                _currentDir = data.current;
+                renderDir(data);
+                // In write mode, re-evaluate select btn based on filename input
+                if (_writeMode) {
+                    const fname = (document.getElementById('browser-filename-input').value || '').trim();
+                    document.getElementById('browser-select-btn').disabled = !fname;
+                }
+            })
             .catch(() => {
                 list.innerHTML = '<div class="text-center py-4 text-danger">'
                     + '<i class="bi bi-exclamation-triangle me-2"></i>Erro ao carregar diretório.</div>';
@@ -354,7 +395,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     list.querySelectorAll('.browser-item.active').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     _selectedPath = path;
-                    document.getElementById('browser-select-btn').disabled = false;
+
+                    if (_writeMode) {
+                        // Pre-fill filename input with the selected file's name
+                        const fname = path.split('/').pop();
+                        const filenameInput = document.getElementById('browser-filename-input');
+                        filenameInput.value = fname;
+                        document.getElementById('browser-select-btn').disabled = !fname;
+                    } else {
+                        document.getElementById('browser-select-btn').disabled = false;
+                    }
                 }
             });
 
@@ -362,6 +412,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn.dataset.isDir === 'false') {
                 btn.addEventListener('dblclick', () => {
                     _selectedPath = btn.dataset.path;
+                    if (_writeMode) {
+                        const fname = btn.dataset.path.split('/').pop();
+                        document.getElementById('browser-filename-input').value = fname;
+                    }
                     confirmBrowse();
                 });
             }
@@ -369,8 +423,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.confirmBrowse = function () {
-        if (_selectedPath && _targetFieldId) {
-            document.getElementById(_targetFieldId).value = _selectedPath;
+        if (_targetFieldId) {
+            if (_writeMode) {
+                const fname = (document.getElementById('browser-filename-input').value || '').trim();
+                if (fname) {
+                    // Join current directory with the typed filename
+                    const dir = _currentDir.replace(/\/+$/, '');
+                    document.getElementById(_targetFieldId).value = dir + '/' + fname;
+                }
+            } else if (_selectedPath) {
+                document.getElementById(_targetFieldId).value = _selectedPath;
+            }
         }
         if (_modal) _modal.hide();
     };

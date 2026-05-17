@@ -71,13 +71,16 @@ class OracleWriter(DataWriter):
         self.mode = mode
         self.client_lib_dir = client_lib_dir
 
-    def write(self, data: pd.DataFrame, target: str, sep_file: str = ",") -> int:
+    def write(self, data: pd.DataFrame, target: str, sep_file: str = ",", append: bool = False) -> int:
         """Escreve o DataFrame na tabela Oracle.
 
         Parameters
         ----------
         target : str
             DSN no formato ``usuario/senha@host:porta/service_name``.
+        append : bool
+            Quando True, insere os dados sem recriar a tabela.
+        """
         """
         try:
             import oracledb
@@ -93,29 +96,30 @@ class OracleWriter(DataWriter):
 
         try:
             logger.debug(
-                "Escrevendo %d linhas na tabela Oracle '%s' (mode=%s)",
-                len(data), self.table_name, self.mode,
+                "Escrevendo %d linhas na tabela Oracle '%s' (mode=%s, append=%s)",
+                len(data), self.table_name, self.mode, append,
             )
             with oracledb.connect(target) as conn:
                 cursor = conn.cursor()
 
-                # Drop table if it exists (Oracle < 23c não suporta DROP TABLE IF EXISTS)
-                try:
-                    cursor.execute(f"DROP TABLE {qualified} PURGE")
-                    logger.debug("Tabela Oracle '%s' removida.", self.table_name)
-                except oracledb.DatabaseError as exc:
-                    # ORA-00942: table or view does not exist — ignorar
-                    err, = exc.args
-                    if err.code != 942:
-                        raise
+                if not append:
+                    # Drop table if it exists (Oracle < 23c não suporta DROP TABLE IF EXISTS)
+                    try:
+                        cursor.execute(f"DROP TABLE {qualified} PURGE")
+                        logger.debug("Tabela Oracle '%s' removida.", self.table_name)
+                    except oracledb.DatabaseError as exc:
+                        # ORA-00942: table or view does not exist — ignorar
+                        err, = exc.args
+                        if err.code != 942:
+                            raise
 
-                # CREATE TABLE com tipos inferidos do DataFrame
-                col_defs = [
-                    f'"{col}" {_oracle_sql_type(dtype)}'
-                    for col, dtype in data.dtypes.items()
-                ]
-                create_sql = f"CREATE TABLE {qualified} ({', '.join(col_defs)})"
-                cursor.execute(create_sql)
+                    # CREATE TABLE com tipos inferidos do DataFrame
+                    col_defs = [
+                        f'"{col}" {_oracle_sql_type(dtype)}'
+                        for col, dtype in data.dtypes.items()
+                    ]
+                    create_sql = f"CREATE TABLE {qualified} ({', '.join(col_defs)})"
+                    cursor.execute(create_sql)
 
                 # INSERT em batch usando bind variables posicionais (:1, :2, ...)
                 if not data.empty:

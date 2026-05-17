@@ -1,4 +1,5 @@
 import logging
+from typing import Iterator
 
 import pandas as pd
 import pyodbc
@@ -40,6 +41,34 @@ class SqlServerReader(DataReader):
             return df
         except pyodbc.Error as exc:
             logger.error("Failed to read table '%s' from SQL Server: %s", self.table_name, exc)
+            raise SourceReadError(
+                f"Failed to read table '{self.table_name}' from SQL Server: {exc}"
+            ) from exc
+
+    def read_chunks(
+        self,
+        source: str,
+        chunk_size: int,
+        sep_file: str = ',',
+        custom_query: str = '',
+    ) -> Iterator[pd.DataFrame]:
+        """Stream SQL Server using pandas' native *chunksize* parameter."""
+        if not source:
+            raise InvalidSourceError("SQL Server connection string is required.")
+
+        query = custom_query.strip() or f"SELECT * FROM {_qualify(self.table_name)}"
+        try:
+            logger.debug(
+                "Streaming SQL Server in chunks of %d rows — query: %s",
+                chunk_size, query,
+            )
+            with pyodbc.connect(source) as connection:
+                for chunk in pd.read_sql(query, connection, chunksize=chunk_size):
+                    yield chunk
+        except pyodbc.Error as exc:
+            logger.error(
+                "Failed to stream table '%s' from SQL Server: %s", self.table_name, exc
+            )
             raise SourceReadError(
                 f"Failed to read table '{self.table_name}' from SQL Server: {exc}"
             ) from exc

@@ -1,4 +1,5 @@
 import logging
+from typing import Iterator
 
 import pandas as pd
 
@@ -101,6 +102,44 @@ class OracleReader(DataReader):
                 "Leitura Oracle concluída: %d linhas", len(df)
             )
             return df
+        except oracledb.Error as exc:
+            logger.error(
+                "Falha ao ler tabela '%s' do Oracle: %s", self.table_name, exc
+            )
+            raise SourceReadError(
+                f"Falha ao ler tabela '{self.table_name}' do Oracle: {exc}"
+            ) from exc
+
+    def read_chunks(
+        self,
+        source: str,
+        chunk_size: int,
+        sep_file: str = ",",
+        custom_query: str = "",
+    ) -> Iterator[pd.DataFrame]:
+        """Stream the Oracle query using pandas' native *chunksize* parameter."""
+        if not source:
+            raise InvalidSourceError("DSN do Oracle é obrigatório.")
+
+        try:
+            import oracledb
+        except ImportError as exc:
+            raise SourceReadError(
+                "Pacote 'oracledb' não está instalado. Execute: pip install oracledb"
+            ) from exc
+
+        if self.mode == "thick":
+            _ensure_thick_mode(self.client_lib_dir)
+
+        query = custom_query.strip() or f"SELECT * FROM {_qualify(self.table_name)}"
+        try:
+            logger.debug(
+                "Streaming Oracle (mode=%s) in chunks of %d rows — query: %s",
+                self.mode, chunk_size, query,
+            )
+            with oracledb.connect(source) as conn:
+                for chunk in pd.read_sql(query, conn, chunksize=chunk_size):
+                    yield chunk
         except oracledb.Error as exc:
             logger.error(
                 "Falha ao ler tabela '%s' do Oracle: %s", self.table_name, exc

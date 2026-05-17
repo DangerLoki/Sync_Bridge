@@ -67,6 +67,9 @@ def transfer(
     query: Annotated[
         Optional[str], typer.Option(help="Consulta/filtro personalizado na leitura.")
     ] = None,
+    chunk_size: Annotated[
+        int, typer.Option("--chunk-size", help="Linhas por lote (0 = carrega tudo na memória).")
+    ] = 0,
 ):
     """Transfere dados entre dois conectores."""
     try:
@@ -81,6 +84,7 @@ def transfer(
             source_encoding=encoding,
             target_encoding=encoding,
             custom_query=query or "",
+            chunk_size=chunk_size,
         )
 
         service = TransferService(reader=reader, writer=writer)

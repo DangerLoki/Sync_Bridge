@@ -14,6 +14,16 @@ class TransferService:
         self.writer = writer
 
     def execute(self, request: TransferRequest) -> TransferResult:
+        if request.chunk_size > 0:
+            return self._execute_chunked(request)
+        return self._execute_full(request)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _execute_full(self, request: TransferRequest) -> TransferResult:
+        """Load the entire source into memory, then write it at once."""
         logger.debug("Reading from '%s'", request.source)
         data = self.reader.read(
             request.source,
@@ -24,8 +34,70 @@ class TransferService:
         logger.debug("Read %d rows from '%s'", rows_read, request.source)
 
         logger.debug("Writing to '%s'", request.target)
-        rows_written = self.writer.write(data, request.target, sep_file=request.target_sep_file)
+        rows_written = self.writer.write(
+            data,
+            request.target,
+            sep_file=request.target_sep_file,
+            append=False,
+        )
         logger.debug("Wrote %d rows to '%s'", rows_written, request.target)
+        self.writer.close()
+
+        return TransferResult(
+            source=request.source,
+            target=request.target,
+            rows_read=rows_read,
+            rows_written=rows_written,
+            status="SUCCESS",
+        )
+
+    def _execute_chunked(self, request: TransferRequest) -> TransferResult:
+        """Stream the source in chunks of *request.chunk_size* rows."""
+        logger.debug(
+            "Starting chunked transfer from '%s' (chunk_size=%d)",
+            request.source,
+            request.chunk_size,
+        )
+        rows_read = 0
+        rows_written = 0
+
+        try:
+            for chunk_index, chunk in enumerate(
+                self.reader.read_chunks(
+                    request.source,
+                    chunk_size=request.chunk_size,
+                    sep_file=request.source_sep_file,
+                    custom_query=request.custom_query,
+                )
+            ):
+                rows_read += len(chunk)
+                logger.debug(
+                    "Chunk %d: %d rows read (total so far: %d)",
+                    chunk_index,
+                    len(chunk),
+                    rows_read,
+                )
+                written = self.writer.write(
+                    chunk,
+                    request.target,
+                    sep_file=request.target_sep_file,
+                    append=(chunk_index > 0),
+                )
+                rows_written += written
+                logger.debug(
+                    "Chunk %d: %d rows written (total so far: %d)",
+                    chunk_index,
+                    written,
+                    rows_written,
+                )
+        finally:
+            self.writer.close()
+
+        logger.debug(
+            "Chunked transfer complete: %d rows read, %d rows written",
+            rows_read,
+            rows_written,
+        )
 
         return TransferResult(
             source=request.source,
