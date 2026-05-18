@@ -1,7 +1,9 @@
 import asyncio
 import json
 import logging
+import os
 import queue as q_mod
+import sys
 import threading
 from pathlib import Path
 from typing import cast
@@ -32,14 +34,13 @@ app = FastAPI(
 )
 
 # ── Asset paths: dev (repo root) vs frozen PyInstaller build ─────────────────
-import os as _os, sys as _sys
-_BASE = _os.environ.get("SYNCBRIDGE_BASE_DIR") or (
-    str(_sys._MEIPASS) if getattr(_sys, "frozen", False)  # type: ignore[attr-defined]
+_BASE = os.environ.get("SYNCBRIDGE_BASE_DIR") or (
+    str(sys._MEIPASS) if getattr(sys, "frozen", False)  # type: ignore[attr-defined]
     else "."
 )
-_TEMPLATES_DIR = _os.path.join(_BASE, "src", "interfaces", "api", "templates")
-_STATIC_DIR    = _os.path.join(_BASE, "src", "interfaces", "api", "static")
-_IMAGE_DIR     = _os.path.join(_BASE, "src", "interfaces", "api", "image")
+_TEMPLATES_DIR = os.path.join(_BASE, "src", "interfaces", "api", "templates")
+_STATIC_DIR = os.path.join(_BASE, "src", "interfaces", "api", "static")
+_IMAGE_DIR = os.path.join(_BASE, "src", "interfaces", "api", "image")
 
 templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 
