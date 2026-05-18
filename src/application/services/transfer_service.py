@@ -44,7 +44,10 @@ class TransferService:
         self.writer.close()
 
         if progress_callback:
-            progress_callback(rows_read=rows_read, rows_written=rows_written, chunk_index=0, done=True)
+            progress_callback(rows_read=rows_read, 
+                              rows_written=rows_written, 
+                              chunk_index=0, 
+                              done=True)
 
         return TransferResult(
             source=request.source,
@@ -94,8 +97,10 @@ class TransferService:
                     rows_written,
                 )
                 if progress_callback:
-                    progress_callback(rows_read=rows_read, rows_written=rows_written,
-                                      chunk_index=chunk_index, done=False)
+                    progress_callback(rows_read=rows_read,
+                                      rows_written=rows_written,
+                                      chunk_index=chunk_index, 
+                                      done=False)
         finally:
             self.writer.close()
 
