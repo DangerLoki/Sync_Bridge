@@ -11,21 +11,23 @@ if getattr(sys, "frozen", False):
     # Work from the directory that contains the .exe / binary so that
     # relative paths (logs/, sample_data/) resolve next to the executable.
     os.chdir(Path(sys.executable).parent)
+    sys.path.insert(0, str(BASE_DIR))
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Ensure Jinja2 / StaticFiles can find templates and static assets
-os.environ.setdefault(
-    "SYNCBRIDGE_BASE_DIR", str(BASE_DIR)
-)
+os.environ.setdefault("SYNCBRIDGE_BASE_DIR", str(BASE_DIR))
 
-import uvicorn  # noqa: E402  (must come after sys.path is set)
+# Import the app object directly — avoids uvicorn string-based module lookup
+# which fails inside a frozen PyInstaller bundle.
+from src.interfaces.api.app import app  # noqa: E402
+
+import uvicorn  # noqa: E402
 
 
 def main() -> None:
     multiprocessing.freeze_support()   # required on Windows
     uvicorn.run(
-        "src.interfaces.api.app:app",
+        app,
         host="0.0.0.0",
         port=8000,
         reload=False,
