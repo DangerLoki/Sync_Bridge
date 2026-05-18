@@ -46,10 +46,13 @@ jobs:
           pyinstaller \
             --onefile \
             --name "sync-bridge-${{ matrix.suffix }}" \
+            --paths "." \
+            --runtime-hook "scripts/hook_src_path.py" \
             --hidden-import "pandas" \
             --hidden-import "pyarrow" \
             --hidden-import "sqlite3" \
             --collect-all "pandas" \
+            --collect-all "src" \
             src/interfaces/cli/main.py
 
       # ── Build Server ───────────────────────────────────────────────────────
@@ -59,6 +62,8 @@ jobs:
           pyinstaller \
             --onefile \
             --name "syncbridge-server-${{ matrix.suffix }}" \
+            --paths "." \
+            --runtime-hook "scripts/hook_src_path.py" \
             --add-data "src/interfaces/api/templates${{ matrix.sep }}src/interfaces/api/templates" \
             --add-data "src/interfaces/api/static${{ matrix.sep }}src/interfaces/api/static" \
             --add-data "src/interfaces/api/image${{ matrix.sep }}src/interfaces/api/image" \
@@ -80,6 +85,7 @@ jobs:
             --hidden-import "pyarrow" \
             --collect-all "pandas" \
             --collect-all "jinja2" \
+            --collect-all "src" \
             scripts/run_server.py
 
       # ── Listar artefatos gerados ───────────────────────────────────────────
