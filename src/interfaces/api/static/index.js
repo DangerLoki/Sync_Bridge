@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     const sourceType = document.getElementById('source_type');
     const targetType = document.getElementById('target_type');
+    const enableStreaming = document.getElementById('enable_streaming');
+    const chunkSize = document.getElementById('chunk_size');
+    const chunkSizeRow = document.getElementById('chunk-size-row');
 
     // ── Visibilidade de campos por tipo ──────────────────────────
     function updateFields(prefix) {
@@ -33,6 +36,26 @@ document.addEventListener('DOMContentLoaded', () => {
         updateQueryHint();
     });
     targetType.addEventListener('change', () => updateFields('target'));
+
+    function updateStreamingControls() {
+        if (!enableStreaming || !chunkSize || !chunkSizeRow) return;
+
+        if (enableStreaming.checked) {
+            chunkSize.readOnly = false;
+            chunkSizeRow.classList.remove('is-disabled');
+            if (parseInt(chunkSize.value || '0', 10) <= 0) {
+                chunkSize.value = '10000';
+            }
+        } else {
+            chunkSize.value = '0';
+            chunkSize.readOnly = true;
+            chunkSizeRow.classList.add('is-disabled');
+        }
+    }
+
+    if (enableStreaming) {
+        enableStreaming.addEventListener('change', updateStreamingControls);
+    }
 
     // ── Dica dinâmica no campo de consulta personalizada ─────────
     function updateQueryHint() {
@@ -80,6 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function validateStep(n) {
         if (n === 1) {
+            if (enableStreaming && enableStreaming.checked &&
+                parseInt((chunkSize || {}).value || '0', 10) <= 0) {
+                alert('Informe um número de linhas por lote maior que zero.');
+                chunkSize.focus();
+                return false;
+            }
             if (sourceType.value === 'sqlserver') {
                 if (!document.getElementById('source_connection_string').value.trim()) {
                     alert('Informe a string de conexão da origem.');
@@ -283,6 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFields('source');
     updateFields('target');
     updateQueryHint();
+    updateStreamingControls();
     goToStep(1);
 });
 
@@ -311,10 +341,9 @@ document.addEventListener('DOMContentLoaded', () => {
             writeRow.classList.remove('d-none');
             filenameInput.value = '';
             if (modalTitle) modalTitle.textContent = 'Escolher pasta de destino';
-            // Enable select btn as soon as the user types a filename
-            filenameInput.oninput = function () {
-                document.getElementById('browser-select-btn').disabled = !filenameInput.value.trim();
-            };
+            // Select button always enabled in write mode — user can confirm current dir
+            document.getElementById('browser-select-btn').disabled = false;
+            filenameInput.oninput = null;
         } else {
             writeRow.classList.add('d-none');
             if (modalTitle) modalTitle.textContent = 'Navegar arquivos';
@@ -340,10 +369,9 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 _currentDir = data.current;
                 renderDir(data);
-                // In write mode, re-evaluate select btn based on filename input
+                // In write mode the select button is always enabled
                 if (_writeMode) {
-                    const fname = (document.getElementById('browser-filename-input').value || '').trim();
-                    document.getElementById('browser-select-btn').disabled = !fname;
+                    document.getElementById('browser-select-btn').disabled = false;
                 }
             })
             .catch(() => {
@@ -426,11 +454,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (_targetFieldId) {
             if (_writeMode) {
                 const fname = (document.getElementById('browser-filename-input').value || '').trim();
-                if (fname) {
-                    // Join current directory with the typed filename
-                    const dir = _currentDir.replace(/\/+$/, '');
-                    document.getElementById(_targetFieldId).value = dir + '/' + fname;
-                }
+                const dir = _currentDir.replace(/\/+$/, '');
+                // If filename typed: dir/filename. Otherwise: just dir (user completes in the field).
+                document.getElementById(_targetFieldId).value = fname ? dir + '/' + fname : dir;
             } else if (_selectedPath) {
                 document.getElementById(_targetFieldId).value = _selectedPath;
             }
@@ -562,3 +588,196 @@ window.testConnection = function (inputId, statusId) {
                 + '<i class="bi bi-x-circle me-1"></i>Erro ao chamar o servidor</span>';
         });
 };
+// ── Transfer streaming terminal ─────────────────────────────────
+(function () {
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = String(str || '');
+        return d.innerHTML;
+    }
+
+    window.copyTerminalLogs = function () {
+        const pre = document.getElementById('terminal-output');
+        if (!pre) return;
+        navigator.clipboard.writeText(pre.innerText || pre.textContent).then(() => {
+            const icon = document.querySelector('#terminal-copy-btn i');
+            if (icon) {
+                icon.className = 'bi bi-clipboard-check';
+                setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+            }
+        });
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const btn = document.getElementById('run-transfer-btn');
+        if (!btn) return;
+        btn.addEventListener('click', runTransferStream);
+    });
+
+    function runTransferStream() {
+        const form        = document.getElementById('transfer-form');
+        const terminal    = document.getElementById('transfer-terminal');
+        const output      = document.getElementById('terminal-output');
+        const progressBar = document.getElementById('terminal-progress-bar');
+        const progressLbl = document.getElementById('terminal-progress-label');
+        const rowsLbl     = document.getElementById('terminal-rows-label');
+        const footer      = document.getElementById('terminal-result-footer');
+        const titleText   = document.getElementById('terminal-title-text');
+        const btn         = document.getElementById('run-transfer-btn');
+
+        // ── reset ──────────────────────────────────────────────
+        output.innerHTML         = '';
+        progressBar.style.width  = '5%';
+        progressBar.className    = 'progress-bar progress-bar-striped progress-bar-animated';
+        progressLbl.textContent  = 'Conectando...';
+        rowsLbl.textContent      = '';
+        footer.className         = 'd-none';
+        footer.innerHTML         = '';
+        titleText.textContent    = 'SyncBridge \u2014 transfer\u00eancia em andamento';
+
+        terminal.classList.remove('d-none');
+        terminal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        btn.disabled  = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" '
+                      + 'style="width:.9rem;height:.9rem"></span>Transferindo...';
+
+        let rowsRead = 0, rowsWritten = 0;
+
+        function appendLine(html) {
+            const span = document.createElement('span');
+            span.innerHTML = html + '\n';
+            output.appendChild(span);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function resetBtn() {
+            btn.disabled  = false;
+            btn.innerHTML = '<i class="bi bi-play-fill"></i> Executar transfer\u00eancia';
+        }
+
+        function handleEvent(event) {
+            const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false });
+
+            if (event.type === 'log') {
+                const lvl    = event.level || 'info';
+                const prefix = { debug: '\u00b7', info: '\u25b8', warning: '\u26a0', error: '\u2716' }[lvl] || '\u25b8';
+                appendLine(`<span class="log-${esc(lvl)}">${ts}  ${prefix}  ${esc(event.msg)}</span>`);
+            }
+
+            if (event.type === 'start') {
+                appendLine(`<span class="log-start">\u25ba  ${esc(event.msg)}</span>`);
+                progressLbl.textContent = 'Transferindo...';
+                progressBar.style.width = '15%';
+            }
+
+            if (event.type === 'progress') {
+                rowsRead    = event.rows_read    || rowsRead;
+                rowsWritten = event.rows_written || rowsWritten;
+                rowsLbl.textContent     = `${rowsRead.toLocaleString('pt-BR')} lidas \u00b7 ${rowsWritten.toLocaleString('pt-BR')} escritas`;
+                progressLbl.textContent = event.done
+                    ? 'Finalizando...'
+                    : `Chunk ${event.chunk_index + 1} processado`;
+            }
+
+            if (event.type === 'done') {
+                rowsRead    = event.rows_read;
+                rowsWritten = event.rows_written;
+                progressBar.style.width  = '100%';
+                progressBar.className    = 'progress-bar bg-success';
+                progressLbl.textContent  = 'Conclu\u00eddo!';
+                rowsLbl.textContent      = `${rowsRead.toLocaleString('pt-BR')} lidas \u00b7 ${rowsWritten.toLocaleString('pt-BR')} escritas`;
+                titleText.textContent    = 'SyncBridge \u2014 conclu\u00eddo \u2713';
+
+                appendLine(`<span class="log-success">\u2714  Transfer\u00eancia conclu\u00edda \u2014 `
+                         + `${rowsRead.toLocaleString('pt-BR')} linhas lidas, `
+                         + `${rowsWritten.toLocaleString('pt-BR')} escritas.</span>`);
+
+                footer.className = '';
+                footer.innerHTML =
+                    '<div class="d-flex align-items-center gap-3 mb-3">'
+                  + '  <span class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle flex-shrink-0" style="width:36px;height:36px"><i class="bi bi-check-lg"></i></span>'
+                  + '  <strong class="result-success fs-6">Transfer\u00eancia conclu\u00edda com sucesso</strong>'
+                  + '</div>'
+                  + '<div class="row g-2 small">'
+                  + '  <div class="col-sm-6"><span class="text-secondary">Status:</span> <strong>' + esc(event.status || 'SUCCESS') + '</strong></div>'
+                  + '  <div class="col-sm-6"><span class="text-secondary">Origem:</span> <strong>' + esc(event.source) + '</strong></div>'
+                  + '  <div class="col-sm-6"><span class="text-secondary">Destino:</span> <strong>' + esc(event.target) + '</strong></div>'
+                  + '  <div class="col-sm-6"><span class="text-secondary">Linhas lidas:</span> <strong>' + rowsRead.toLocaleString('pt-BR') + '</strong></div>'
+                  + '  <div class="col-sm-6"><span class="text-secondary">Linhas escritas:</span> <strong>' + rowsWritten.toLocaleString('pt-BR') + '</strong></div>'
+                  + '</div>'
+                  + '<div class="mt-3">'
+                  + '  <button type="button" class="btn btn-outline-light btn-sm" onclick="location.reload()">'
+                  + '    <i class="bi bi-arrow-repeat me-1"></i>Nova transfer\u00eancia'
+                  + '  </button>'
+                  + '</div>';
+
+                resetBtn();
+            }
+
+            if (event.type === 'error') {
+                progressBar.style.width  = '100%';
+                progressBar.className    = 'progress-bar bg-danger';
+                progressLbl.textContent  = 'Erro!';
+                titleText.textContent    = 'SyncBridge \u2014 erro \u2716';
+
+                appendLine(`<span class="log-error">\u2716  ${esc(event.msg)}</span>`);
+
+                footer.className = '';
+                footer.innerHTML =
+                    '<div class="d-flex align-items-center gap-2 mb-2">'
+                  + '  <span class="d-inline-flex align-items-center justify-content-center bg-danger text-white rounded-circle flex-shrink-0" style="width:36px;height:36px"><i class="bi bi-exclamation-triangle"></i></span>'
+                  + '  <strong class="result-error fs-6">Erro na transfer\u00eancia</strong>'
+                  + '</div>'
+                  + '<p class="small mb-2" style="color:#f38ba8">' + esc(event.msg) + '</p>'
+                  + '<button type="button" class="btn btn-outline-light btn-sm" onclick="window.goToStep(3)">'
+                  + '  <i class="bi bi-arrow-left me-1"></i>Voltar e corrigir'
+                  + '</button>';
+
+                resetBtn();
+            }
+        }
+
+        // ── SSE via fetch ReadableStream ────────────────────────
+        fetch('/transfer/stream', {
+            method: 'POST',
+            body: new FormData(form),
+        }).then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const reader  = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer    = '';
+
+            function processChunk(value) {
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try { handleEvent(JSON.parse(line.slice(6))); }
+                        catch (_) { /* ignore */ }
+                    }
+                }
+            }
+
+            function pump() {
+                return reader.read().then(({ done, value }) => {
+                    if (done) return;
+                    processChunk(value);
+                    return pump();
+                });
+            }
+
+            return pump();
+
+        }).catch(err => {
+            appendLine(`<span class="log-error">\u2716  Erro de comunica\u00e7\u00e3o: ${esc(String(err))}</span>`);
+            progressBar.className    = 'progress-bar bg-danger';
+            progressBar.style.width  = '100%';
+            progressLbl.textContent  = 'Erro de conex\u00e3o';
+            resetBtn();
+        });
+    }
+
+}());

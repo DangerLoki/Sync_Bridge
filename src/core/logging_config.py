@@ -25,7 +25,8 @@ def setup_logging(level: int = logging.INFO) -> None:
         encoding="utf-8",
         utc=False,
     )
-    file_handler.suffix = "%Y-%m-%d"   # ex: sync_bridge.log.2026-05-16
+    # suffix "%Y-%m-%d" já é o padrão para when="midnight"
+    # ex de arquivo rotacionado: sync_bridge.log.2026-05-16
     file_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()

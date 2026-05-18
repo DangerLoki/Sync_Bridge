@@ -1,9 +1,13 @@
+import asyncio
+import json
 import logging
+import queue as q_mod
+import threading
 from pathlib import Path
 from typing import cast
 
 from fastapi import FastAPI, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -96,6 +100,9 @@ def build_writer(
 @app.get("/browse")
 def browse(path: str = Query(default=".")) -> JSONResponse:
     base = Path(path).resolve()
+    # If a file path is given, browse its parent directory instead
+    if base.is_file():
+        base = base.parent
     entries = []
     try:
         items = sorted(base.iterdir(), key=lambda e: (e.is_file(), e.name.lower()))
@@ -105,12 +112,20 @@ def browse(path: str = Query(default=".")) -> JSONResponse:
                 "path": str(entry),
                 "is_dir": entry.is_dir(),
             })
-    except PermissionError:
+    except PermissionError as exc:
+        logger.warning("Browse permission denied for '%s': %s", base, exc)
         pass
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
+        logger.warning("Browse path not found '%s': %s", base, exc)
         return JSONResponse(
             status_code=404,
             content={"error": f"Path not found: {str(base)}"},
+        )
+    except Exception as exc:
+        logger.error("Browse unexpected error for '%s': %s", base, exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(exc)},
         )
     parent = str(base.parent) if base.parent != base else None
     return JSONResponse({"current": str(base), "parent": parent, "entries": entries})
@@ -178,6 +193,194 @@ def test_connection_bigquery(
 def health() -> dict:
     logger.debug("Health check requested")
     return {"status": "ok"}
+
+
+@app.post("/transfer/stream")
+async def transfer_stream(
+    request: Request,
+    source_type: str = Form(...),
+    target_type: str = Form(...),
+    source: str = Form(''),
+    target: str = Form(''),
+    source_table_name: str = Form(''),
+    target_table_name: str = Form(''),
+    source_sep_file: str = Form(','),
+    target_sep_file: str = Form(','),
+    source_encoding: str = Form('utf-8-sig'),
+    target_encoding: str = Form('utf-8-sig'),
+    target_compression: str = Form('snappy'),
+    source_connection_string: str = Form(''),
+    target_connection_string: str = Form(''),
+    source_table_name_sql: str = Form(''),
+    target_table_name_sql: str = Form(''),
+    source_oracle_dsn: str = Form(''),
+    target_oracle_dsn: str = Form(''),
+    source_table_name_oracle: str = Form(''),
+    target_table_name_oracle: str = Form(''),
+    source_oracle_mode: str = Form('thin'),
+    target_oracle_mode: str = Form('thin'),
+    source_oracle_client_dir: str = Form(''),
+    target_oracle_client_dir: str = Form(''),
+    source_bq_credentials_file: str = Form(''),
+    target_bq_credentials_file: str = Form(''),
+    source_bq_project_id: str = Form(''),
+    target_bq_project_id: str = Form(''),
+    source_table_name_bq: str = Form(''),
+    target_table_name_bq: str = Form(''),
+    source_custom_query: str = Form(''),
+    chunk_size: int = Form(0),
+):
+    """SSE endpoint — streams transfer progress as newline-delimited JSON events."""
+    # ── normalise connection fields (same logic as /transfer) ──
+    if source_type == "sqlserver" and source_connection_string:
+        source = source_connection_string
+    if target_type == "sqlserver" and target_connection_string:
+        target = target_connection_string
+    if source_type == "sqlserver":
+        source_table_name = source_table_name_sql
+    if target_type == "sqlserver":
+        target_table_name = target_table_name_sql
+    if source_type == "oracle" and source_oracle_dsn:
+        source = source_oracle_dsn
+    if target_type == "oracle" and target_oracle_dsn:
+        target = target_oracle_dsn
+    if source_type == "oracle":
+        source_table_name = source_table_name_oracle
+    if target_type == "oracle":
+        target_table_name = target_table_name_oracle
+    if source_type == "bigquery" and source_bq_credentials_file:
+        source = source_bq_credentials_file
+    if target_type == "bigquery" and target_bq_credentials_file:
+        target = target_bq_credentials_file
+    if source_type == "bigquery":
+        source_table_name = source_table_name_bq
+    if target_type == "bigquery":
+        target_table_name = target_table_name_bq
+
+    event_queue: q_mod.Queue = q_mod.Queue()
+
+    # ── custom log handler that feeds the queue ────────────────
+    class _SSELogHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:  # type: ignore[override]
+            try:
+                event_queue.put({
+                    "type": "log",
+                    "level": record.levelname.lower(),
+                    "msg": self.format(record),
+                })
+            except Exception:
+                pass
+
+    sse_handler = _SSELogHandler()
+    sse_handler.setLevel(logging.DEBUG)
+    sse_handler.setFormatter(logging.Formatter("%(name)s — %(message)s"))
+    root_log = logging.getLogger()
+    root_log.addHandler(sse_handler)
+
+    # ── run transfer in a background thread ────────────────────
+    _src_snap = source
+    _tgt_snap = target
+
+    def _run() -> None:
+        try:
+            # validation
+            if source_type == "sqlite" and not source_table_name:
+                raise ValueError("Nome da tabela é obrigatório para origens SQLite.")
+            if target_type == "sqlite" and not target_table_name:
+                raise ValueError("Nome da tabela é obrigatório para destinos SQLite.")
+            if source_type == "sqlserver" and not source_table_name:
+                raise ValueError("Nome da tabela é obrigatório para origens SQL Server.")
+            if target_type == "sqlserver" and not target_table_name:
+                raise ValueError("Nome da tabela é obrigatório para destinos SQL Server.")
+
+            reader = build_reader(
+                source_type=source_type,
+                table_name=source_table_name,
+                encoding=source_encoding,
+                oracle_mode=source_oracle_mode,
+                oracle_client_dir=source_oracle_client_dir,
+                bq_project_id=source_bq_project_id,
+            )
+            writer = build_writer(
+                target_type=target_type,
+                table_name=target_table_name,
+                encoding=target_encoding,
+                compression=cast(ParquetCompression, target_compression),
+                oracle_mode=target_oracle_mode,
+                oracle_client_dir=target_oracle_client_dir,
+                bq_project_id=target_bq_project_id,
+            )
+
+            service = TransferService(reader=reader, writer=writer)
+            transfer_req = TransferRequest(
+                source=_src_snap,
+                target=_tgt_snap,
+                source_sep_file=source_sep_file,
+                target_sep_file=target_sep_file,
+                source_encoding=source_encoding,
+                target_encoding=target_encoding,
+                custom_query=source_custom_query,
+                chunk_size=chunk_size,
+            )
+
+            event_queue.put({"type": "start",
+                             "msg": f"Iniciando transferência: {_src_snap} → {_tgt_snap}"})
+
+            def _on_progress(rows_read: int, rows_written: int,
+                             chunk_index: int, done: bool) -> None:
+                event_queue.put({
+                    "type": "progress",
+                    "rows_read": rows_read,
+                    "rows_written": rows_written,
+                    "chunk_index": chunk_index,
+                    "done": done,
+                })
+
+            result = service.execute(transfer_req, progress_callback=_on_progress)
+            event_queue.put({
+                "type": "done",
+                "rows_read": result.rows_read,
+                "rows_written": result.rows_written,
+                "source": result.source,
+                "target": result.target,
+                "status": result.status,
+            })
+        except Exception as exc:
+            logger.error("Transfer stream failed: %s", exc)
+            event_queue.put({"type": "error", "msg": str(exc)})
+        finally:
+            root_log.removeHandler(sse_handler)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+    # ── async SSE generator ────────────────────────────────────
+
+    async def _generate():
+        loop = asyncio.get_event_loop()
+        # keepalive comment so the browser doesn't close the stream
+        yield ": keepalive\n\n"
+        while True:
+            try:
+                event = await loop.run_in_executor(
+                    None, lambda: event_queue.get(timeout=120)
+                )
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("type") in ("done", "error"):
+                    break
+            except q_mod.Empty:
+                yield ": keepalive\n\n"
+            except Exception:
+                break
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
  
  
 @app.get("/", response_class=HTMLResponse)

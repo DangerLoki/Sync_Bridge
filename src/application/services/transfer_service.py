@@ -13,16 +13,16 @@ class TransferService:
         self.reader = reader
         self.writer = writer
 
-    def execute(self, request: TransferRequest) -> TransferResult:
+    def execute(self, request: TransferRequest, progress_callback=None) -> TransferResult:
         if request.chunk_size > 0:
-            return self._execute_chunked(request)
-        return self._execute_full(request)
+            return self._execute_chunked(request, progress_callback=progress_callback)
+        return self._execute_full(request, progress_callback=progress_callback)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _execute_full(self, request: TransferRequest) -> TransferResult:
+    def _execute_full(self, request: TransferRequest, progress_callback=None) -> TransferResult:
         """Load the entire source into memory, then write it at once."""
         logger.debug("Reading from '%s'", request.source)
         data = self.reader.read(
@@ -43,6 +43,9 @@ class TransferService:
         logger.debug("Wrote %d rows to '%s'", rows_written, request.target)
         self.writer.close()
 
+        if progress_callback:
+            progress_callback(rows_read=rows_read, rows_written=rows_written, chunk_index=0, done=True)
+
         return TransferResult(
             source=request.source,
             target=request.target,
@@ -51,7 +54,7 @@ class TransferService:
             status="SUCCESS",
         )
 
-    def _execute_chunked(self, request: TransferRequest) -> TransferResult:
+    def _execute_chunked(self, request: TransferRequest, progress_callback=None) -> TransferResult:
         """Stream the source in chunks of *request.chunk_size* rows."""
         logger.debug(
             "Starting chunked transfer from '%s' (chunk_size=%d)",
@@ -90,6 +93,9 @@ class TransferService:
                     written,
                     rows_written,
                 )
+                if progress_callback:
+                    progress_callback(rows_read=rows_read, rows_written=rows_written,
+                                      chunk_index=chunk_index, done=False)
         finally:
             self.writer.close()
 
