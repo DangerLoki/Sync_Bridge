@@ -1,6 +1,8 @@
 # SyncBridge
 
 [![CI](https://github.com/DangerLoki/Sync_Bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/DangerLoki/Sync_Bridge/actions/workflows/ci.yml)
+[![Release](https://github.com/DangerLoki/Sync_Bridge/actions/workflows/release.yml/badge.svg)](https://github.com/DangerLoki/Sync_Bridge/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/DangerLoki/Sync_Bridge)](https://github.com/DangerLoki/Sync_Bridge/releases/latest)
 
 Ferramenta **local** de transferência de dados tabulares entre arquivos e bancos de dados. Roda na máquina do desenvolvedor — não é um serviço de rede exposto, não possui endpoints públicos e não foi projetado para acesso remoto.
 
@@ -24,8 +26,10 @@ O projeto permite:
 - operar via **CLI** ou via **interface web (FastAPI)**
 - navegar e selecionar arquivos pelo navegador integrado na interface web
 - testar conexões (SQL Server, Oracle, BigQuery) diretamente pela interface
+- acompanhar a transferência em **tempo real** num terminal integrado à página (logs coloridos + barra de progresso)
 - tratar erros de leitura e escrita com exceções customizadas
 - validar o fluxo com testes automatizados
+- **executar sem instalar Python** — binários standalone disponíveis para Linux e Windows nas [Releases](https://github.com/DangerLoki/Sync_Bridge/releases)
 
 ## Funcionalidades atuais
 
@@ -40,6 +44,8 @@ O projeto permite:
   - **Bancos de dados** (SQLite, SQL Server, Oracle, BigQuery): consulta SQL nativa que substitui o `SELECT *` padrão
   - **Arquivos** (CSV, Parquet): expressão `pandas.DataFrame.query()` aplicada após a leitura
 - Interface **Web (FastAPI + Jinja2 + Bootstrap 5)** com wizard de 3 etapas (Entrada → Saída → Resumo)
+- **Terminal de progresso em tempo real** — ao executar uma transferência, um painel terminal dark-mode exibe logs coloridos por nível, barra de progresso animada e contador de linhas lidas/escritas sem recarregar a página
+- Transferência em **modo chunked/streaming** — parâmetro `chunk_size` para processar arquivos grandes em lotes sem carregar tudo na memória
 - Navegador de arquivos do servidor integrado à interface web
 - Botão de **testar conexão** para SQL Server, Oracle e BigQuery
 - Campos condicionais por tipo de origem/destino
@@ -47,9 +53,10 @@ O projeto permite:
 - Interface **CLI** com fluxos de demonstração pré-configurados
 - Estrutura em camadas com conectores desacoplados por interfaces (Ports and Adapters)
 - Tratamento de erros com exceções customizadas
-- **Logging** com rotação de arquivo (`logs/sync_bridge.log`, máx. 5 MB, 3 backups)
+- **Logging** com rotação diária de arquivo (`logs/sync_bridge.log`, mantém os últimos 30 dias)
 - **Testes unitários** para domínio, DTO, serviço e conectores (CSV, SQLite, Parquet) com mocks
 - **Testes de integração** end-to-end entre os conectores com `pytest`
+- **Binários standalone** para Linux e Windows gerados automaticamente via PyInstaller no GitHub Actions — sem necessidade de instalar Python
 
 ## Conectores disponíveis
 
@@ -154,6 +161,7 @@ Essa estrutura facilita a evolução do projeto para novos conectores no futuro,
 * **oracledb** — conexão com Oracle (modo Thin puro-Python ou Thick com Instant Client)
 * **google-cloud-bigquery** + **db-dtypes** — conexão com BigQuery via API
 * **SQLite** (stdlib) — banco de dados local
+* **PyInstaller** — geração de binários standalone para Linux e Windows
 * **Pytest** — testes automatizados
 * **pytest-cov** — cobertura de testes (integrado ao CI)
 * **httpx** — cliente HTTP usado pelo `TestClient` do FastAPI nos testes de API
@@ -164,6 +172,34 @@ Essa estrutura facilita a evolução do projeto para novos conectores no futuro,
 * **uv** — gerenciador de pacotes e lockfile (alternativa rápida ao pip)
 * **Docker** — containerização da aplicação (API e CLI)
 * **GitHub Actions** — CI com testes, lint e validação do container Docker
+
+## Download direto (sem Python)
+
+Baixe o executável da [página de Releases](https://github.com/DangerLoki/Sync_Bridge/releases/latest):
+
+| Plataforma | CLI | Servidor Web |
+|---|---|---|
+| 🐧 Linux   | `sync-bridge-linux`       | `syncbridge-server-linux`       |
+| 🪟 Windows | `sync-bridge-windows.exe` | `syncbridge-server-windows.exe` |
+
+**Linux** — dar permissão de execução na primeira vez:
+```bash
+chmod +x sync-bridge-linux syncbridge-server-linux
+
+# CLI
+./sync-bridge-linux --help
+
+# Servidor web → abre http://localhost:8000
+./syncbridge-server-linux
+```
+
+**Windows** — executar direto:
+```cmd
+sync-bridge-windows.exe --help
+syncbridge-server-windows.exe
+```
+
+---
 
 ## Instalação
 
@@ -341,7 +377,7 @@ pytest tests/integration/ -v
 1. **Entrada** — Selecione o tipo de origem (CSV, SQLite, Parquet, SQL Server, Oracle ou BigQuery), informe o caminho/connection string/DSN/credenciais, configure os parâmetros específicos e, opcionalmente, escreva uma consulta personalizada
 2. **Saída** — Selecione o tipo de destino e configure os parâmetros de escrita
 3. **Resumo** — Revise a configuração (incluindo a consulta, se houver) e execute a transferência
-4. **Resultado** — Veja o status, quantidade de linhas lidas e escritas
+4. **Resultado** — Acompanhe em tempo real pelo **terminal integrado** (logs coloridos por nível, barra de progresso animada, contador de linhas). Ao final, veja o resumo com status, linhas lidas e escritas.
 
 ## Tratamento de erros
 
@@ -412,7 +448,8 @@ pip install -e ".[bigquery]"
 * interface web moderna com Bootstrap 5 e wizard interativo
 * testes automatizados com pytest (unitários com mocks + integração end-to-end)
 * containerização com Docker (multi-stage build para API e CLI)
-* CI/CD com GitHub Actions (testes, lint, mypy e validação do container Docker)
+* CI/CD com GitHub Actions (testes, lint, mypy, validação do container Docker e **build de binários standalone via PyInstaller para Linux e Windows**)
+* release automatizada no GitHub com binários anexados ao criar uma tag `v*`
 
 ## Limitações atuais
 
