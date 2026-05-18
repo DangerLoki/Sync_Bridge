@@ -30,11 +30,21 @@ app = FastAPI(
     description="API para transferência de dados entre arquivos e bancos locais.",
     version="1.0.0",
 )
- 
-templates = Jinja2Templates(directory="src/interfaces/api/templates")
 
-app.mount("/static", StaticFiles(directory="src/interfaces/api/static"), name="static")
-app.mount("/image", StaticFiles(directory="src/interfaces/api/image"), name="image")
+# ── Asset paths: dev (repo root) vs frozen PyInstaller build ─────────────────
+import os as _os, sys as _sys
+_BASE = _os.environ.get("SYNCBRIDGE_BASE_DIR") or (
+    str(_sys._MEIPASS) if getattr(_sys, "frozen", False)  # type: ignore[attr-defined]
+    else "."
+)
+_TEMPLATES_DIR = _os.path.join(_BASE, "src", "interfaces", "api", "templates")
+_STATIC_DIR    = _os.path.join(_BASE, "src", "interfaces", "api", "static")
+_IMAGE_DIR     = _os.path.join(_BASE, "src", "interfaces", "api", "image")
+
+templates = Jinja2Templates(directory=_TEMPLATES_DIR)
+
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+app.mount("/image",  StaticFiles(directory=_IMAGE_DIR),  name="image")
 
 
 def build_reader(

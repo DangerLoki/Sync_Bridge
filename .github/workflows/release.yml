@@ -1,0 +1,154 @@
+name: Release — PyInstaller Builds
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]*"
+
+permissions:
+  contents: write   # necessário para criar a GitHub Release
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            suffix: linux
+            sep: ":"
+          - os: windows-latest
+            suffix: windows
+            sep: ";"
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── Python ────────────────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── Dependências ──────────────────────────────────────────────────────
+      - name: Install dependencies
+        shell: bash
+        run: |
+          pip install -e ".[api,parquet]"
+          pip install pyinstaller
+
+      # ── Build CLI ─────────────────────────────────────────────────────────
+      - name: Build CLI binary
+        shell: bash
+        run: |
+          pyinstaller \
+            --onefile \
+            --name "sync-bridge-${{ matrix.suffix }}" \
+            --hidden-import "pandas" \
+            --hidden-import "pyarrow" \
+            --hidden-import "sqlite3" \
+            --collect-all "pandas" \
+            src/interfaces/cli/main.py
+
+      # ── Build Server ───────────────────────────────────────────────────────
+      - name: Build Server binary
+        shell: bash
+        run: |
+          pyinstaller \
+            --onefile \
+            --name "syncbridge-server-${{ matrix.suffix }}" \
+            --add-data "src/interfaces/api/templates${{ matrix.sep }}src/interfaces/api/templates" \
+            --add-data "src/interfaces/api/static${{ matrix.sep }}src/interfaces/api/static" \
+            --add-data "src/interfaces/api/image${{ matrix.sep }}src/interfaces/api/image" \
+            --hidden-import "uvicorn.logging" \
+            --hidden-import "uvicorn.loops" \
+            --hidden-import "uvicorn.loops.auto" \
+            --hidden-import "uvicorn.protocols" \
+            --hidden-import "uvicorn.protocols.http" \
+            --hidden-import "uvicorn.protocols.http.auto" \
+            --hidden-import "uvicorn.protocols.http.h11_impl" \
+            --hidden-import "uvicorn.protocols.websockets.auto" \
+            --hidden-import "uvicorn.lifespan.on" \
+            --hidden-import "uvicorn.lifespan.off" \
+            --hidden-import "fastapi" \
+            --hidden-import "jinja2" \
+            --hidden-import "multipart" \
+            --hidden-import "anyio" \
+            --hidden-import "pandas" \
+            --hidden-import "pyarrow" \
+            --collect-all "pandas" \
+            --collect-all "jinja2" \
+            scripts/run_server.py
+
+      # ── Listar artefatos gerados ───────────────────────────────────────────
+      - name: List dist/
+        shell: bash
+        run: ls -lh dist/
+
+      # ── Upload artefatos para uso no job de release ───────────────────────
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.suffix }}
+          path: dist/
+          if-no-files-found: error
+
+  # ── Cria a GitHub Release e anexa todos os binários ──────────────────────
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-linux
+          path: release/
+
+      - name: Download Windows binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows
+          path: release/
+
+      - name: List release/
+        run: ls -lh release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "SyncBridge ${{ github.ref_name }}"
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            ## SyncBridge ${{ github.ref_name }}
+
+            ### Downloads
+
+            | Plataforma | CLI | Servidor Web |
+            |---|---|---|
+            | 🐧 Linux   | `sync-bridge-linux`         | `syncbridge-server-linux`         |
+            | 🪟 Windows | `sync-bridge-windows.exe`   | `syncbridge-server-windows.exe`   |
+
+            ### Como usar
+
+            **CLI** — sem instalação de Python:
+            ```bash
+            ./sync-bridge-linux --help
+            ```
+
+            **Servidor Web** — abre `http://localhost:8000` no navegador:
+            ```bash
+            ./syncbridge-server-linux
+            # ou no Windows:
+            syncbridge-server-windows.exe
+            ```
+
+            > Veja o [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) para detalhes.
+          files: |
+            release/**
