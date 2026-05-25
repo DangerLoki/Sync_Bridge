@@ -781,3 +781,187 @@ window.testConnection = function (inputId, statusId) {
     }
 
 }());
+
+// ── Connection String Builder — SQL Server ──────────────────────
+(function () {
+    let _targetInputId = null;
+    let _csbModal = null;
+
+    window.openConnStringBuilder = function (targetInputId) {
+        _targetInputId = targetInputId;
+        if (!_csbModal) {
+            _csbModal = new bootstrap.Modal(document.getElementById('connStringBuilderModal'));
+            document.getElementById('connStringBuilderModal').addEventListener('input', _updateCsbPreview);
+            document.getElementById('connStringBuilderModal').addEventListener('change', _updateCsbPreview);
+        }
+        const current = document.getElementById(targetInputId).value.trim();
+        // Reset form to defaults before populating
+        document.getElementById('csb-server').value = '';
+        document.getElementById('csb-port').value = '';
+        document.getElementById('csb-database').value = '';
+        document.getElementById('csb-uid').value = '';
+        document.getElementById('csb-pwd').value = '';
+        document.getElementById('csb-auth-sql').checked = true;
+        document.getElementById('csb-encrypt').checked = false;
+        document.getElementById('csb-trust-cert').checked = false;
+        document.getElementById('csb-driver').selectedIndex = 0;
+        if (current) _parseCsb(current);
+        _updateCsbPreview();
+        _csbModal.show();
+    };
+
+    function _parseCsb(str) {
+        const get = function (key) {
+            const m = str.match(new RegExp(key + '=([^;]+)', 'i'));
+            return m ? m[1].trim() : '';
+        };
+        const driver = get('DRIVER').replace(/[{}]/g, '');
+        const serverFull = get('SERVER');
+        const parts = serverFull.split(',');
+        document.getElementById('csb-server').value = parts[0] || '';
+        document.getElementById('csb-port').value = parts[1] || '';
+        document.getElementById('csb-database').value = get('DATABASE');
+        const trusted = get('Trusted_Connection');
+        if (trusted.toLowerCase() === 'yes') {
+            document.getElementById('csb-auth-win').checked = true;
+        } else {
+            document.getElementById('csb-auth-sql').checked = true;
+            document.getElementById('csb-uid').value = get('UID');
+        }
+        const driverSel = document.getElementById('csb-driver');
+        for (let i = 0; i < driverSel.options.length; i++) {
+            if (driverSel.options[i].value.toLowerCase() === driver.toLowerCase()) {
+                driverSel.selectedIndex = i;
+                break;
+            }
+        }
+        document.getElementById('csb-encrypt').checked = /Encrypt=yes/i.test(str);
+        document.getElementById('csb-trust-cert').checked = /TrustServerCertificate=yes/i.test(str);
+    }
+
+    function _toggleCsbAuth() {
+        const isWin = document.getElementById('csb-auth-win').checked;
+        document.getElementById('csb-sql-auth-fields').classList.toggle('d-none', isWin);
+    }
+
+    function _buildCsbString() {
+        const driver    = document.getElementById('csb-driver').value;
+        const server    = document.getElementById('csb-server').value.trim();
+        const port      = document.getElementById('csb-port').value.trim();
+        const database  = document.getElementById('csb-database').value.trim();
+        const isWin     = document.getElementById('csb-auth-win').checked;
+        const uid       = document.getElementById('csb-uid').value.trim();
+        const pwd       = document.getElementById('csb-pwd').value;
+        const encrypt   = document.getElementById('csb-encrypt').checked;
+        const trustCert = document.getElementById('csb-trust-cert').checked;
+        const serverStr = (server && port) ? server + ',' + port : server;
+        let str = 'DRIVER={' + driver + '};';
+        if (serverStr) str += 'SERVER=' + serverStr + ';';
+        if (database)  str += 'DATABASE=' + database + ';';
+        if (isWin) {
+            str += 'Trusted_Connection=yes;';
+        } else {
+            if (uid) str += 'UID=' + uid + ';';
+            if (pwd) str += 'PWD=' + pwd + ';';
+        }
+        if (encrypt)   str += 'Encrypt=yes;';
+        if (trustCert) str += 'TrustServerCertificate=yes;';
+        return str;
+    }
+
+    function _updateCsbPreview() {
+        _toggleCsbAuth();
+        const el = document.getElementById('csb-preview');
+        if (el) el.textContent = _buildCsbString();
+    }
+
+    window.applyConnString = function () {
+        if (_targetInputId) {
+            document.getElementById(_targetInputId).value = _buildCsbString();
+        }
+        if (_csbModal) _csbModal.hide();
+    };
+
+    window.toggleCsbPassword = function () {
+        const input = document.getElementById('csb-pwd');
+        const icon  = document.getElementById('csb-pwd-eye');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (icon) icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            if (icon) icon.className = 'bi bi-eye';
+        }
+    };
+}());
+
+// ── Connection String Builder — Oracle DSN ──────────────────────
+(function () {
+    let _targetInputId = null;
+    let _odbModal = null;
+
+    window.openOracleDsnBuilder = function (targetInputId) {
+        _targetInputId = targetInputId;
+        if (!_odbModal) {
+            _odbModal = new bootstrap.Modal(document.getElementById('oracleDsnBuilderModal'));
+            document.getElementById('oracleDsnBuilderModal').addEventListener('input', _updateOdbPreview);
+        }
+        // Reset form before populating
+        document.getElementById('odb-user').value = '';
+        document.getElementById('odb-pwd').value = '';
+        document.getElementById('odb-host').value = '';
+        document.getElementById('odb-port').value = '1521';
+        document.getElementById('odb-service').value = '';
+        const current = document.getElementById(targetInputId).value.trim();
+        if (current) _parseOdb(current);
+        _updateOdbPreview();
+        _odbModal.show();
+    };
+
+    function _parseOdb(str) {
+        // Format: user/pass@host:port/service
+        const m = str.match(/^([^/@]*)\/([^@]*)@([^:/]*):?(\d*)\/?(.*)?$/);
+        if (m) {
+            document.getElementById('odb-user').value    = m[1] || '';
+            document.getElementById('odb-pwd').value     = m[2] || '';
+            document.getElementById('odb-host').value    = m[3] || '';
+            document.getElementById('odb-port').value    = m[4] || '1521';
+            document.getElementById('odb-service').value = m[5] || '';
+        }
+    }
+
+    function _buildOdbString() {
+        const user    = document.getElementById('odb-user').value.trim();
+        const pwd     = document.getElementById('odb-pwd').value;
+        const host    = document.getElementById('odb-host').value.trim();
+        const port    = document.getElementById('odb-port').value.trim() || '1521';
+        const service = document.getElementById('odb-service').value.trim();
+        return user + '/' + pwd + '@' + host + ':' + port + '/' + service;
+    }
+
+    function _updateOdbPreview() {
+        const el = document.getElementById('odb-preview');
+        if (el) el.textContent = _buildOdbString();
+    }
+
+    window.applyOracleDsn = function () {
+        if (_targetInputId) {
+            document.getElementById(_targetInputId).value = _buildOdbString();
+        }
+        if (_odbModal) _odbModal.hide();
+    };
+
+    window.toggleOdbPassword = function () {
+        const input = document.getElementById('odb-pwd');
+        const icon  = document.getElementById('odb-pwd-eye');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (icon) icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            if (icon) icon.className = 'bi bi-eye';
+        }
+    };
+}());

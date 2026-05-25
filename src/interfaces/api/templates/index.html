@@ -135,9 +135,15 @@
 
                     <div class="col-12 source-field source-sqlserver-field d-none">
                         <label class="form-label fw-semibold">String de conexão</label>
-                        <input type="text" class="form-control" id="source_connection_string"
-                               name="source_connection_string"
-                               placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Connection=yes;">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="source_connection_string"
+                                   name="source_connection_string"
+                                   placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Connection=yes;">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="openConnStringBuilder('source_connection_string')">
+                                <i class="bi bi-tools me-1"></i>Montar
+                            </button>
+                        </div>
                         <div class="d-flex align-items-center gap-2 mt-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary"
                                     onclick="testConnection('source_connection_string', 'source-conn-status')">
@@ -156,9 +162,15 @@
                     <!-- ── Oracle ─────────────────────────────────── -->
                     <div class="col-12 source-field source-oracle-field d-none">
                         <label class="form-label fw-semibold">DSN de conex&#xe3;o</label>
-                        <input type="text" class="form-control" id="source_oracle_dsn"
-                               name="source_oracle_dsn"
-                               placeholder="usuario/senha@host:1521/FREEPDB1">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="source_oracle_dsn"
+                                   name="source_oracle_dsn"
+                                   placeholder="usuario/senha@host:1521/FREEPDB1">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="openOracleDsnBuilder('source_oracle_dsn')">
+                                <i class="bi bi-tools me-1"></i>Montar
+                            </button>
+                        </div>
                         <div class="d-flex align-items-center gap-2 mt-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary"
                                     onclick="testOracleConnection('source')">
@@ -371,9 +383,15 @@
 
                     <div class="col-12 target-field target-sqlserver-field d-none">
                         <label class="form-label fw-semibold">String de conexão</label>
-                        <input type="text" class="form-control" id="target_connection_string"
-                               name="target_connection_string"
-                               placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Connection=yes;">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="target_connection_string"
+                                   name="target_connection_string"
+                                   placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=mydb;Trusted_Connection=yes;">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="openConnStringBuilder('target_connection_string')">
+                                <i class="bi bi-tools me-1"></i>Montar
+                            </button>
+                        </div>
                         <div class="d-flex align-items-center gap-2 mt-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary"
                                     onclick="testConnection('target_connection_string', 'target-conn-status')">
@@ -392,9 +410,15 @@
                     <!-- ── Oracle ─────────────────────────────────── -->
                     <div class="col-12 target-field target-oracle-field d-none">
                         <label class="form-label fw-semibold">DSN de conex&#xe3;o</label>
-                        <input type="text" class="form-control" id="target_oracle_dsn"
-                               name="target_oracle_dsn"
-                               placeholder="usuario/senha@host:1521/FREEPDB1">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="target_oracle_dsn"
+                                   name="target_oracle_dsn"
+                                   placeholder="usuario/senha@host:1521/FREEPDB1">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="openOracleDsnBuilder('target_oracle_dsn')">
+                                <i class="bi bi-tools me-1"></i>Montar
+                            </button>
+                        </div>
                         <div class="d-flex align-items-center gap-2 mt-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary"
                                     onclick="testOracleConnection('target')">
@@ -641,6 +665,170 @@
                         <i class="bi bi-check-lg me-1"></i>Selecionar
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Montar string de conexão SQL Server ────────────── -->
+<div class="modal fade" id="connStringBuilderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-tools text-primary fs-5"></i>
+                    <h5 class="modal-title fw-bold mb-0">Montar string de conex&#xe3;o &#x2014; SQL Server</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Driver ODBC</label>
+                    <select class="form-select" id="csb-driver">
+                        <option value="ODBC Driver 17 for SQL Server">ODBC Driver 17 for SQL Server</option>
+                        <option value="ODBC Driver 18 for SQL Server">ODBC Driver 18 for SQL Server</option>
+                        <option value="ODBC Driver 13 for SQL Server">ODBC Driver 13 for SQL Server</option>
+                        <option value="SQL Server">SQL Server (leg&#xe1;do)</option>
+                    </select>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-8">
+                        <label class="form-label fw-semibold">Servidor / Host</label>
+                        <input type="text" class="form-control" id="csb-server"
+                               placeholder="localhost ou 192.168.1.10">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-semibold">
+                            Porta <span class="text-body-secondary fw-normal small">(opcional)</span>
+                        </label>
+                        <input type="number" class="form-control" id="csb-port" placeholder="1433">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Banco de dados</label>
+                    <input type="text" class="form-control" id="csb-database" placeholder="mydb">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Autentica&#xe7;&#xe3;o</label>
+                    <div class="d-flex gap-4 pt-1">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="csb-auth"
+                                   id="csb-auth-sql" value="sql" checked>
+                            <label class="form-check-label" for="csb-auth-sql">SQL Server</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="csb-auth"
+                                   id="csb-auth-win" value="windows">
+                            <label class="form-check-label" for="csb-auth-win">Windows (Trusted)</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="csb-sql-auth-fields">
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Usu&#xe1;rio</label>
+                            <input type="text" class="form-control" id="csb-uid" placeholder="sa">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Senha</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="csb-pwd"
+                                       placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;">
+                                <button type="button" class="btn btn-outline-secondary"
+                                        onclick="toggleCsbPassword()">
+                                    <i class="bi bi-eye" id="csb-pwd-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="csb-encrypt">
+                        <label class="form-check-label" for="csb-encrypt">Encrypt=yes</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="csb-trust-cert">
+                        <label class="form-check-label" for="csb-trust-cert">TrustServerCertificate=yes</label>
+                    </div>
+                </div>
+                <div class="p-3 bg-body-secondary rounded-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bi bi-code-slash text-primary small"></i>
+                        <span class="small fw-semibold text-body-secondary">Pr&#xe9;-visualiza&#xe7;&#xe3;o</span>
+                    </div>
+                    <code class="d-block small" id="csb-preview"
+                          style="word-break:break-all;white-space:pre-wrap"></code>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="applyConnString()">
+                    <i class="bi bi-check-lg me-1"></i>Usar string
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Montar DSN Oracle ──────────────────────────────── -->
+<div class="modal fade" id="oracleDsnBuilderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-tools text-primary fs-5"></i>
+                    <h5 class="modal-title fw-bold mb-0">Montar DSN &#x2014; Oracle</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Usu&#xe1;rio</label>
+                        <input type="text" class="form-control" id="odb-user" placeholder="scott">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Senha</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="odb-pwd"
+                                   placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="toggleOdbPassword()">
+                                <i class="bi bi-eye" id="odb-pwd-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-8">
+                        <label class="form-label fw-semibold">Host</label>
+                        <input type="text" class="form-control" id="odb-host"
+                               placeholder="localhost ou 192.168.1.10">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-semibold">Porta</label>
+                        <input type="number" class="form-control" id="odb-port" value="1521">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Service Name</label>
+                    <input type="text" class="form-control" id="odb-service" placeholder="FREEPDB1">
+                </div>
+                <div class="p-3 bg-body-secondary rounded-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bi bi-code-slash text-primary small"></i>
+                        <span class="small fw-semibold text-body-secondary">Pr&#xe9;-visualiza&#xe7;&#xe3;o</span>
+                    </div>
+                    <code class="d-block small" id="odb-preview"
+                          style="word-break:break-all;white-space:pre-wrap"></code>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="applyOracleDsn()">
+                    <i class="bi bi-check-lg me-1"></i>Usar DSN
+                </button>
             </div>
         </div>
     </div>
