@@ -17,9 +17,9 @@ else:
 
 os.environ.setdefault("SYNCBRIDGE_BASE_DIR", str(BASE_DIR))
 
-# Import the app object directly — avoids uvicorn string-based module lookup
-# which fails inside a frozen PyInstaller bundle.
-from src.interfaces.api.app import app  # noqa: E402
+# Import the extended app directly — it keeps transfer jobs alive independently
+# from the browser connection and supports reconnect/cancel after a page refresh.
+from src.interfaces.api.session_app import app  # noqa: E402
 
 import uvicorn  # noqa: E402
 
