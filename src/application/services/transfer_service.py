@@ -1,11 +1,15 @@
 import logging
+from collections.abc import Callable
 
 from src.application.dto.transfer_request import TransferRequest
+from src.domain.exceptions.transfer_exceptions import TransferCancelled
 from src.domain.models.transfer_result import TransferResult
 from src.domain.ports.data_reader import DataReader
 from src.domain.ports.data_writer import DataWriter
 
 logger = logging.getLogger(__name__)
+
+CancelCheck = Callable[[], bool]
 
 
 class TransferService:
@@ -13,41 +17,81 @@ class TransferService:
         self.reader = reader
         self.writer = writer
 
-    def execute(self, request: TransferRequest, progress_callback=None) -> TransferResult:
+    def execute(
+        self,
+        request: TransferRequest,
+        progress_callback=None,
+        cancel_check: CancelCheck | None = None,
+    ) -> TransferResult:
         if request.chunk_size > 0:
-            return self._execute_chunked(request, progress_callback=progress_callback)
-        return self._execute_full(request, progress_callback=progress_callback)
+            return self._execute_chunked(
+                request,
+                progress_callback=progress_callback,
+                cancel_check=cancel_check,
+            )
+        return self._execute_full(
+            request,
+            progress_callback=progress_callback,
+            cancel_check=cancel_check,
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _execute_full(self, request: TransferRequest, progress_callback=None) -> TransferResult:
-        """Load the entire source into memory, then write it at once."""
-        logger.debug("Reading from '%s'", request.source)
-        data = self.reader.read(
-            request.source,
-            sep_file=request.source_sep_file,
-            custom_query=request.custom_query,
-        )
-        rows_read = len(data)
-        logger.debug("Read %d rows from '%s'", rows_read, request.source)
+    @staticmethod
+    def _raise_if_cancelled(cancel_check: CancelCheck | None) -> None:
+        if cancel_check and cancel_check():
+            raise TransferCancelled("Transferência cancelada pelo usuário.")
 
-        logger.debug("Writing to '%s'", request.target)
-        rows_written = self.writer.write(
-            data,
-            request.target,
-            sep_file=request.target_sep_file,
-            append=False,
-        )
-        logger.debug("Wrote %d rows to '%s'", rows_written, request.target)
-        self.writer.close()
+    def _execute_full(
+        self,
+        request: TransferRequest,
+        progress_callback=None,
+        cancel_check: CancelCheck | None = None,
+    ) -> TransferResult:
+        """Load the entire source into memory, then write it at once."""
+        rows_read = 0
+        rows_written = 0
+
+        try:
+            self._raise_if_cancelled(cancel_check)
+
+            logger.debug("Reading from '%s'", request.source)
+            data = self.reader.read(
+                request.source,
+                sep_file=request.source_sep_file,
+                custom_query=request.custom_query,
+            )
+            rows_read = len(data)
+            logger.debug("Read %d rows from '%s'", rows_read, request.source)
+
+            # A cancellation requested while a blocking read was running is
+            # honoured before anything is written to the destination.
+            self._raise_if_cancelled(cancel_check)
+
+            logger.debug("Writing to '%s'", request.target)
+            rows_written = self.writer.write(
+                data,
+                request.target,
+                sep_file=request.target_sep_file,
+                append=False,
+            )
+            logger.debug("Wrote %d rows to '%s'", rows_written, request.target)
+
+            # Drivers may block inside write(). Honour a cancellation request
+            # as soon as control returns to the service.
+            self._raise_if_cancelled(cancel_check)
+        finally:
+            self.writer.close()
 
         if progress_callback:
-            progress_callback(rows_read=rows_read, 
-                              rows_written=rows_written, 
-                              chunk_index=0, 
-                              done=True)
+            progress_callback(
+                rows_read=rows_read,
+                rows_written=rows_written,
+                chunk_index=0,
+                done=True,
+            )
 
         return TransferResult(
             source=request.source,
@@ -57,7 +101,12 @@ class TransferService:
             status="SUCCESS",
         )
 
-    def _execute_chunked(self, request: TransferRequest, progress_callback=None) -> TransferResult:
+    def _execute_chunked(
+        self,
+        request: TransferRequest,
+        progress_callback=None,
+        cancel_check: CancelCheck | None = None,
+    ) -> TransferResult:
         """Stream the source in chunks of *request.chunk_size* rows."""
         logger.debug(
             "Starting chunked transfer from '%s' (chunk_size=%d)",
@@ -68,6 +117,8 @@ class TransferService:
         rows_written = 0
 
         try:
+            self._raise_if_cancelled(cancel_check)
+
             for chunk_index, chunk in enumerate(
                 self.reader.read_chunks(
                     request.source,
@@ -76,6 +127,10 @@ class TransferService:
                     custom_query=request.custom_query,
                 )
             ):
+                # If cancellation happened while the next chunk was being read,
+                # do not write that chunk to the destination.
+                self._raise_if_cancelled(cancel_check)
+
                 rows_read += len(chunk)
                 logger.debug(
                     "Chunk %d: %d rows read (total so far: %d)",
@@ -96,11 +151,16 @@ class TransferService:
                     written,
                     rows_written,
                 )
+
                 if progress_callback:
-                    progress_callback(rows_read=rows_read,
-                                      rows_written=rows_written,
-                                      chunk_index=chunk_index, 
-                                      done=False)
+                    progress_callback(
+                        rows_read=rows_read,
+                        rows_written=rows_written,
+                        chunk_index=chunk_index,
+                        done=False,
+                    )
+
+                self._raise_if_cancelled(cancel_check)
         finally:
             self.writer.close()
 
