@@ -2,6 +2,10 @@ class TransferError(Exception):
     """Base exception for transfer-related errors."""
 
 
+class TransferCancelled(TransferError):
+    """Raised when a running transfer is cancelled by the user."""
+
+
 class SourceReadError(TransferError):
     """Raised when the source cannot be read."""
 
